@@ -1,0 +1,16 @@
+{
+  "rules": [
+    {
+      "id": "post_run_smoke",
+      "enabled": false,
+      "onEvent": "run_completed",
+      "when": {
+        "done": true
+      },
+      "command": "node",
+      "args": ["scripts/smoke-test.mjs"],
+      "cwd": ".",
+      "timeoutMs": 45000
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "id": "spec-1771746441695",
+  "version": "1.0.0",
+  "created": "2026-02-22T07:47:21.696Z",
+  "updated": "2026-02-22T07:47:21.697Z",
+  "title": "User Auth",
+  "description": "Auth system",
+  "status": "draft",
+  "requirements": [
+    {
+      "id": "REQ-M6YQOP0ZM",
+      "text": "User can login",
+      "priority": "medium",
+      "status": "pending",
+      "createdAt": "2026-02-22T07:47:21.697Z"
+    },
+    {
+      "id": "REQ-XKUKLEK9M",
+      "text": "System validates credentials",
+      "priority": "medium",
+      "status": "pending",
+      "createdAt": "2026-02-22T07:47:21.697Z"
+    }
+  ],
+  "userStories": [],
+  "apiSpecs": [],
+  "dataModels": [],
+  "acceptanceCriteria": [],
+  "implementationPlan": null,
+  "dependencies": [],
+  "risks": [],
+  "estimates": null
+}

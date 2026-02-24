@@ -1,0 +1,24 @@
+{
+  "name": "openclaw-plus",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Open-source, model-agnostic AI agent interface with pluggable skills and MCP-ready architecture.",
+  "scripts": {
+    "dev": "node server/index.mjs",
+    "start": "node server/index.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "smoke:api": "node scripts/api-smoke.mjs",
+    "mcp:bridge": "node scripts/openclaw-mcp-bridge.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.5",
+    "discord.js": "^14.22.1",
+    "dotenv": "^16.6.1",
+    "express": "^4.21.2",
+    "grammy": "^1.38.3",
+    "jsonwebtoken": "^9.0.2",
+    "playwright": "^1.58.2",
+    "ws": "^8.18.3"
+  }
+}

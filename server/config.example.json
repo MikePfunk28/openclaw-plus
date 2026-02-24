@@ -1,0 +1,147 @@
+{
+  "port": 8787,
+  "models": [
+    {
+      "id": "openai-gpt-4.1-mini",
+      "label": "GPT-4.1 Mini",
+      "provider": "openai-compatible",
+      "model": "gpt-4.1-mini",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "fallbacks": [
+        "anthropic-sonnet"
+      ]
+    },
+    {
+      "id": "anthropic-sonnet",
+      "label": "Claude Sonnet",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-5",
+      "apiKeyEnv": "ANTHROPIC_API_KEY"
+    }
+  ],
+  "agent": {
+    "maxSteps": 8,
+    "maxCycles": 4,
+    "failoverOn": [
+      "rate_limit",
+      "timeout",
+      "server",
+      "auth"
+    ]
+  },
+  "agents": {
+    "list": [
+      {
+        "id": "main",
+        "name": "Main Agent",
+        "default": true
+      },
+      {
+        "id": "ops",
+        "name": "Ops Agent"
+      }
+    ]
+  },
+  "bindings": [
+    {
+      "agentId": "main",
+      "match": {
+        "channel": "telegram",
+        "accountId": "default"
+      }
+    },
+    {
+      "agentId": "ops",
+      "match": {
+        "channel": "discord",
+        "accountId": "default"
+      }
+    }
+  ],
+  "session": {
+    "dmScope": "per-channel-peer"
+  },
+  "auth": {
+    "mode": "token",
+    "jwtSecretEnv": "OPENCLAW_JWT_SECRET",
+    "users": [
+      {
+        "id": "owner",
+        "name": "Owner",
+        "role": "admin",
+        "tokenEnv": "OPENCLAW_OWNER_TOKEN",
+        "toolPolicy": {
+          "approvalMode": "never",
+          "allowPatterns": [
+            "*"
+          ],
+          "denyPatterns": []
+        }
+      }
+    ]
+  },
+  "security": {
+    "mode": "open",
+    "wsTokenEnv": "OPENCLAW_WS_TOKEN",
+    "inboundTokenEnv": "OPENCLAW_INBOUND_TOKEN",
+    "cors": {
+      "allowOrigin": "*",
+      "allowHeaders": "Content-Type, Authorization, X-Inbound-Token",
+      "allowMethods": "GET, POST, OPTIONS"
+    },
+    "rateLimit": {
+      "windowMs": 60000,
+      "max": 90
+    },
+    "toolInputPolicies": {
+      "shell_execute": {
+        "forbiddenPatterns": [
+          "\\brm\\s+-rf\\s+\\/",
+          "\\bshutdown\\b",
+          "\\bformat\\s+[a-z]:"
+        ]
+      },
+      "process_control": {
+        "allowedActions": [
+          "list",
+          "kill",
+          "start"
+        ]
+      }
+    }
+  },
+  "automation": {
+    "enabled": false
+  },
+  "channels": {
+    "telegram": {
+      "enabled": false,
+      "tokenEnv": "TELEGRAM_BOT_TOKEN",
+      "modelId": "openai-gpt-4.1-mini",
+      "allowFrom": [
+        "*"
+      ]
+    },
+    "discord": {
+      "enabled": false,
+      "tokenEnv": "DISCORD_BOT_TOKEN",
+      "modelId": "openai-gpt-4.1-mini",
+      "allowFrom": [
+        "*"
+      ]
+    }
+  },
+  "mcpServers": [
+    {
+      "id": "filesystem",
+      "transport": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ]
+    }
+  ]
+}

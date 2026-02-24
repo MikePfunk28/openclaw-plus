@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "openclaw": {
+      "command": "node",
+      "args": ["M:/betterAI/scripts/openclaw-mcp-bridge.mjs"],
+      "env": {
+        "OPENCLAW_BASE_URL": "http://127.0.0.1:8787",
+        "OPENCLAW_OWNER_TOKEN": "replace-with-your-owner-token",
+        "OPENCLAW_BRIDGE_REQUIRE_AUTH": "true"
+      }
+    }
+  }
+}
