@@ -1,114 +1,122 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>OpenClaw Plus</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw Plus - AI Agent Control Plane</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
+</head>
+<body>
     <div class="bg-glow"></div>
+    
     <div class="app-shell">
-      <aside class="sidebar">
-        <div class="brand">
-          <div class="badge"></div>
-          <div>
-            <h1>OpenClaw Plus</h1>
-            <p>Model-agnostic open agent</p>
-          </div>
-        </div>
+        <!-- Left Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="badge"></div>
+                <div>
+                    <h1>OpenClaw Plus</h1>
+                    <p>AI Agent Control Plane</p>
+                </div>
+            </div>
 
-        <section>
-          <h2>Access Token</h2>
-          <input id="tokenInput" type="password" placeholder="Bearer token (optional)" />
-        </section>
+            <section>
+                <h2>Connection</h2>
+                <div id="connectionStatus" class="connection-status offline">offline</div>
+                <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button id="reconnectBtn">Reconnect</button>
+                </div>
+            </section>
 
-        <section>
-          <div class="heading-row">
-            <h2>Realtime</h2>
-            <button id="reconnectBtn" type="button">Reconnect</button>
-          </div>
-          <div id="connectionStatus" class="connection-status offline">offline</div>
-        </section>
+            <section>
+                <h2>Auth Token</h2>
+                <input type="password" id="tokenInput" placeholder="Bearer token (optional)">
+            </section>
 
-        <section>
-          <h2>Model</h2>
-          <select id="modelSelect"></select>
-        </section>
+            <section>
+                <div class="heading-row">
+                    <h2>Model</h2>
+                </div>
+                <select id="modelSelect"></select>
+            </section>
 
-        <section>
-          <div class="heading-row">
-            <h2>Sessions</h2>
-            <button id="newSessionBtn" type="button">New</button>
-          </div>
-          <div id="sessionList" class="session-list"></div>
-        </section>
+            <section>
+                <div class="heading-row">
+                    <h2>Sessions</h2>
+                    <button id="newSessionBtn">+ New</button>
+                </div>
+                <div id="sessionList" class="session-list"></div>
+            </section>
 
-        <section>
-          <h2>Run Settings</h2>
-          <label class="setting">Transport
-            <select id="transportModeSelect">
-              <option value="auto">auto (prefer websocket)</option>
-              <option value="ws">websocket only</option>
-              <option value="http">http stream only</option>
-            </select>
-          </label>
-          <label class="setting">Max steps<input id="maxStepsInput" type="number" min="1" max="50" value="8" /></label>
-          <label class="setting">Max cycles<input id="maxCyclesInput" type="number" min="1" max="20" value="4" /></label>
-          <label class="setting">Autonomy
-            <select id="autonomyModeSelect">
-              <option value="continuous">continuous</option>
-              <option value="single-cycle">single-cycle</option>
-            </select>
-          </label>
-          <label class="setting">Approvals
-            <select id="approvalModeSelect">
-              <option value="never">never (auto-run)</option>
-              <option value="manual">manual (block)</option>
-            </select>
-          </label>
-        </section>
+            <section>
+                <div class="heading-row">
+                    <h2>Skills</h2>
+                    <button id="refreshBtn">Refresh</button>
+                </div>
+                <div id="skillList" class="skill-list"></div>
+            </section>
+        </aside>
 
-        <section>
-          <div class="heading-row">
-            <h2>Skills</h2>
-            <button id="refreshBtn" type="button">Refresh</button>
-          </div>
-          <div id="skillList" class="skill-list"></div>
-        </section>
-      </aside>
+        <!-- Main Chat Panel -->
+        <main class="main-panel">
+            <div id="chat" class="chat"></div>
+            
+            <div class="composer-wrap">
+                <div class="setting">
+                    <label>Transport Mode</label>
+                    <select id="transportModeSelect">
+                        <option value="auto">Auto (WebSocket with HTTP fallback)</option>
+                        <option value="ws">WebSocket only</option>
+                        <option value="http">HTTP streaming only</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <div class="setting" style="flex: 1;">
+                        <label>Max Steps</label>
+                        <input type="number" id="maxStepsInput" value="8" min="1" max="50">
+                    </div>
+                    <div class="setting" style="flex: 1;">
+                        <label>Max Cycles</label>
+                        <input type="number" id="maxCyclesInput" value="4" min="1" max="20">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <div class="setting" style="flex: 1;">
+                        <label>Autonomy</label>
+                        <select id="autonomyModeSelect">
+                            <option value="continuous">Continuous</option>
+                            <option value="step">Step-by-step</option>
+                        </select>
+                    </div>
+                    <div class="setting" style="flex: 1;">
+                        <label>Approval</label>
+                        <select id="approvalModeSelect">
+                            <option value="never">Never</option>
+                            <option value="always">Always</option>
+                        </select>
+                    </div>
+                </div>
+                <textarea id="promptInput" placeholder="Enter your objective... (Ctrl+Enter to run)"></textarea>
+                <button id="sendBtn">Run Agent</button>
+            </div>
+        </main>
 
-      <main class="main-panel">
-        <div id="chat" class="chat"></div>
-        <div class="composer-wrap">
-          <textarea
-            id="promptInput"
-            placeholder="Ask for a plan, a code change, or a multi-step task..."
-            rows="3"
-          ></textarea>
-          <button id="sendBtn" type="button">Run Agent</button>
-        </div>
-      </main>
-
-      <aside class="trace-panel">
-        <h2>Execution Trace</h2>
-        <div id="traceList" class="trace-list"></div>
-      </aside>
+        <!-- Right Trace Panel -->
+        <aside class="trace-panel">
+            <h2>Execution Trace</h2>
+            <div id="traceList" class="trace-list"></div>
+        </aside>
     </div>
 
+    <!-- Message Template -->
     <template id="messageTemplate">
-      <article class="message">
-        <div class="meta"></div>
-        <div class="content"></div>
-      </article>
+        <article class="message">
+            <div class="meta"></div>
+            <div class="content"></div>
+        </article>
     </template>
 
-    <script type="module" src="/app.js"></script>
-  </body>
+    <script src="app.js" type="module"></script>
+</body>
 </html>
