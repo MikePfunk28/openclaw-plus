@@ -1,0 +1,331 @@
+{
+  "port": 8787,
+  "models": [
+    {
+      "id": "claude-opus-4.6",
+      "label": "Claude Opus 4.6",
+      "provider": "anthropic",
+      "model": "claude-opus-4-6-20250514",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "contextWindow": 200000,
+      "capabilities": ["chat", "vision", "tools", "streaming"],
+      "pricing": { "input": 15, "output": 75 }
+    },
+    {
+      "id": "claude-sonnet-4.6",
+      "label": "Claude Sonnet 4.6",
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-6-20250514",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "contextWindow": 200000,
+      "capabilities": ["chat", "vision", "tools", "streaming"],
+      "pricing": { "input": 3, "output": 15 }
+    },
+    {
+      "id": "claude-haiku-3.5",
+      "label": "Claude Haiku 3.5",
+      "provider": "anthropic",
+      "model": "claude-3-5-haiku-20241022",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "contextWindow": 200000,
+      "capabilities": ["chat", "tools", "streaming"],
+      "pricing": { "input": 0.80, "output": 4 }
+    },
+    {
+      "id": "gpt-5.3",
+      "label": "GPT-5.3",
+      "provider": "openai",
+      "model": "gpt-5.3",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "contextWindow": 200000,
+      "capabilities": ["chat", "vision", "tools", "streaming"],
+      "pricing": { "input": 10, "output": 30 }
+    },
+    {
+      "id": "gpt-5.3-codex",
+      "label": "GPT-5.3 Codex",
+      "provider": "openai",
+      "model": "gpt-5.3-codex",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "contextWindow": 200000,
+      "capabilities": ["chat", "code", "tools", "streaming"],
+      "specialty": "coding",
+      "pricing": { "input": 10, "output": 30 }
+    },
+    {
+      "id": "gpt-5.3-mini",
+      "label": "GPT-5.3 Mini",
+      "provider": "openai",
+      "model": "gpt-5.3-mini",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "tools", "streaming"],
+      "pricing": { "input": 0.15, "output": 0.60 }
+    },
+    {
+      "id": "o3",
+      "label": "OpenAI o3",
+      "provider": "openai",
+      "model": "o3",
+      "apiKeyEnv": "OPENAI_API_KEY",
+      "contextWindow": 200000,
+      "capabilities": ["chat", "reasoning"],
+      "specialty": "reasoning",
+      "pricing": { "input": 20, "output": 60 }
+    },
+    {
+      "id": "gemini-3.1-pro",
+      "label": "Gemini 3.1 Pro",
+      "provider": "google",
+      "model": "gemini-3.1-pro",
+      "apiKeyEnv": "GOOGLE_API_KEY",
+      "contextWindow": 2000000,
+      "capabilities": ["chat", "vision", "tools", "streaming"],
+      "pricing": { "input": 1.25, "output": 5 }
+    },
+    {
+      "id": "gemini-3.1-flash",
+      "label": "Gemini 3.1 Flash",
+      "provider": "google",
+      "model": "gemini-3.1-flash",
+      "apiKeyEnv": "GOOGLE_API_KEY",
+      "contextWindow": 1000000,
+      "capabilities": ["chat", "vision", "tools", "streaming"],
+      "pricing": { "input": 0.075, "output": 0.30 }
+    },
+    {
+      "id": "veo-3.1",
+      "label": "Veo 3.1 (Video)",
+      "provider": "google",
+      "model": "veo-3.1",
+      "apiKeyEnv": "GOOGLE_API_KEY",
+      "capabilities": ["video-generation"],
+      "specialty": "video"
+    },
+    {
+      "id": "lyria-3.1",
+      "label": "Lyria 3.1 (Audio)",
+      "provider": "google",
+      "model": "lyria-3.1",
+      "apiKeyEnv": "GOOGLE_API_KEY",
+      "capabilities": ["audio-generation"],
+      "specialty": "music"
+    },
+    {
+      "id": "deepseek-3.2",
+      "label": "DeepSeek 3.2",
+      "provider": "openai-compatible",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "model": "deepseek-3.2",
+      "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "reasoning", "streaming"],
+      "specialty": "reasoning",
+      "pricing": { "input": 0.27, "output": 1.10 }
+    },
+    {
+      "id": "deepseek-r1",
+      "label": "DeepSeek R1",
+      "provider": "openai-compatible",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "model": "deepseek-reasoner",
+      "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "reasoning"],
+      "specialty": "reasoning"
+    },
+    {
+      "id": "deepseek-coder",
+      "label": "DeepSeek Coder",
+      "provider": "openai-compatible",
+      "baseUrl": "https://api.deepseek.com/v1",
+      "model": "deepseek-coder",
+      "apiKeyEnv": "DEEPSEEK_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "code"],
+      "specialty": "coding"
+    },
+    {
+      "id": "glm-5",
+      "label": "GLM 5",
+      "provider": "openai-compatible",
+      "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+      "model": "glm-5",
+      "apiKeyEnv": "ZHIPU_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "vision", "tools"],
+      "specialty": "multilingual"
+    },
+    {
+      "id": "glm-5-plus",
+      "label": "GLM 5 Plus",
+      "provider": "openai-compatible",
+      "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+      "model": "glm-5-plus",
+      "apiKeyEnv": "ZHIPU_API_KEY",
+      "contextWindow": 256000,
+      "capabilities": ["chat", "vision", "tools"]
+    },
+    {
+      "id": "minimax-2.5",
+      "label": "MiniMax 2.5",
+      "provider": "openai-compatible",
+      "baseUrl": "https://api.minimax.chat/v1",
+      "model": "minimax-2.5",
+      "apiKeyEnv": "MINIMAX_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "tools"]
+    },
+    {
+      "id": "grok-3",
+      "label": "Grok 3",
+      "provider": "openai-compatible",
+      "baseUrl": "https://api.x.ai/v1",
+      "model": "grok-3",
+      "apiKeyEnv": "XAI_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "tools", "web-search"]
+    },
+    {
+      "id": "llama-4-maverick",
+      "label": "Llama 4 Maverick",
+      "provider": "openai-compatible",
+      "baseUrl": "https://api.together.xyz/v1",
+      "model": "meta-llama/Llama-4-Maverick-17B",
+      "apiKeyEnv": "TOGETHER_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "vision"]
+    },
+    {
+      "id": "llama-4-scout",
+      "label": "Llama 4 Scout",
+      "provider": "openai-compatible",
+      "baseUrl": "https://api.together.xyz/v1",
+      "model": "meta-llama/Llama-4-Scout-17B",
+      "apiKeyEnv": "TOGETHER_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat"]
+    },
+    {
+      "id": "mistral-large-3",
+      "label": "Mistral Large 3",
+      "provider": "openai-compatible",
+      "baseUrl": "https://api.mistral.ai/v1",
+      "model": "mistral-large-3",
+      "apiKeyEnv": "MISTRAL_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "tools"]
+    },
+    {
+      "id": "codestral-3",
+      "label": "Codestral 3",
+      "provider": "openai-compatible",
+      "baseUrl": "https://api.mistral.ai/v1",
+      "model": "codestral-3",
+      "apiKeyEnv": "MISTRAL_API_KEY",
+      "contextWindow": 64000,
+      "capabilities": ["chat", "code"],
+      "specialty": "coding"
+    },
+    {
+      "id": "qwen-3-72b",
+      "label": "Qwen 3 72B",
+      "provider": "openai-compatible",
+      "baseUrl": "https://api.together.xyz/v1",
+      "model": "Qwen/Qwen3-72B",
+      "apiKeyEnv": "TOGETHER_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "code"]
+    },
+    {
+      "id": "cohere-command-a",
+      "label": "Command A",
+      "provider": "cohere",
+      "model": "command-a",
+      "apiKeyEnv": "COHERE_API_KEY",
+      "contextWindow": 256000,
+      "capabilities": ["chat", "tools"],
+      "specialty": "enterprise"
+    },
+    {
+      "id": "ollama-local",
+      "label": "Ollama (Local)",
+      "provider": "openai-compatible",
+      "baseUrl": "http://localhost:11434/v1",
+      "model": "llama4",
+      "apiKeyEnv": "",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "tools"],
+      "local": true
+    },
+    {
+      "id": "vllm-local",
+      "label": "vLLM (Local)",
+      "provider": "openai-compatible",
+      "baseUrl": "http://localhost:8000/v1",
+      "model": "local-model",
+      "apiKeyEnv": "VLLM_API_KEY",
+      "contextWindow": 128000,
+      "capabilities": ["chat", "tools"],
+      "local": true
+    }
+  ],
+  "agents": {
+    "default": {
+      "model": "claude-sonnet-4.6",
+      "maxSteps": 10,
+      "maxCycles": 5,
+      "autonomyMode": "continuous",
+      "approvalMode": "never"
+    },
+    "coding": {
+      "model": "gpt-5.3-codex",
+      "maxSteps": 15,
+      "maxCycles": 3,
+      "preferredSkills": ["workspace_files", "shell_execute", "git", "database", "http_client"],
+      "systemPrompt": "You are an expert software engineer. Write clean, efficient, well-documented code."
+    },
+    "research": {
+      "model": "gemini-3.1-pro",
+      "maxSteps": 8,
+      "maxCycles": 5,
+      "preferredSkills": ["web_fetch", "http_client", "data_processing", "nlp"],
+      "systemPrompt": "You are a research assistant. Find, analyze, and synthesize information accurately."
+    },
+    "reasoning": {
+      "model": "deepseek-3.2",
+      "maxSteps": 5,
+      "maxCycles": 3,
+      "systemPrompt": "You are a logical reasoning expert. Think step by step and explain your reasoning."
+    },
+    "quick": {
+      "model": "claude-haiku-3.5",
+      "maxSteps": 5,
+      "maxCycles": 2,
+      "systemPrompt": "You are a fast, efficient assistant. Give concise, direct answers."
+    },
+    "vision": {
+      "model": "gemini-3.1-pro",
+      "maxSteps": 8,
+      "preferredSkills": ["workspace_files", "http_client"],
+      "systemPrompt": "You are a visual analysis expert. Analyze images and describe what you see in detail."
+    }
+  },
+  "security": {
+    "mode": "balanced",
+    "guardrails": {
+      "input": ["pii_detection", "prompt_injection", "jailbreak"],
+      "output": ["pii_scrub"],
+      "tools": ["dangerous_commands", "network_access", "file_access"]
+    },
+    "rateLimit": {
+      "windowMs": 60000,
+      "max": 120
+    }
+  },
+  "telemetry": {
+    "enabled": true,
+    "logLevel": "info",
+    "traceSampling": 1.0
+  }
+}

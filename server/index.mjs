@@ -449,6 +449,124 @@ app.get("/ai-sdks", (_req, res) => {
   res.json({ sdks: AI_SDKS });
 });
 
+import { agentManager, AGENT_TEMPLATES } from "./lib/agent-manager.mjs";
+import { setupWizard } from "./lib/setup-wizard.mjs";
+
+app.get("/api/agents", (_req, res) => {
+  res.json({ agents: agentManager.listAgents() });
+});
+
+app.post("/api/agents", (req, res) => {
+  const agent = agentManager.createAgent(req.body);
+  res.json({ ok: true, agent });
+});
+
+app.get("/api/agents/:id", (req, res) => {
+  const agent = agentManager.getAgent(req.params.id);
+  if (!agent) {
+    res.status(404).json({ error: "Agent not found" });
+    return;
+  }
+  res.json({ agent });
+});
+
+app.patch("/api/agents/:id", (req, res) => {
+  const agent = agentManager.updateAgent(req.params.id, req.body);
+  if (!agent) {
+    res.status(404).json({ error: "Agent not found" });
+    return;
+  }
+  res.json({ ok: true, agent });
+});
+
+app.delete("/api/agents/:id", (req, res) => {
+  const deleted = agentManager.deleteAgent(req.params.id);
+  res.json({ ok: deleted });
+});
+
+app.get("/api/agents/:id/sub-agents", (req, res) => {
+  const subAgents = agentManager.listSubAgents(req.params.id);
+  res.json({ subAgents });
+});
+
+app.post("/api/agents/:id/sub-agents", (req, res) => {
+  try {
+    const subAgent = agentManager.createSubAgent(req.params.id, req.body);
+    res.json({ ok: true, subAgent });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/agents/templates", (_req, res) => {
+  res.json({ templates: AGENT_TEMPLATES });
+});
+
+app.post("/api/agents/from-template", (req, res) => {
+  const { templateId, ...overrides } = req.body;
+  const template = AGENT_TEMPLATES[templateId];
+  if (!template) {
+    res.status(404).json({ error: "Template not found" });
+    return;
+  }
+  const agent = agentManager.createAgent({ ...template, ...overrides });
+  res.json({ ok: true, agent });
+});
+
+app.get("/api/setup/steps", (_req, res) => {
+  res.json({ steps: setupWizard.getSteps() });
+});
+
+app.get("/api/setup/steps/:stepId", (req, res) => {
+  const step = setupWizard.getStep(req.params.stepId);
+  if (!step) {
+    res.status(404).json({ error: "Step not found" });
+    return;
+  }
+  res.json({ step });
+});
+
+app.post("/api/setup/save-env", async (req, res) => {
+  try {
+    await setupWizard.saveEnv(req.body);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/setup/quick-setup", async (req, res) => {
+  try {
+    const result = await setupWizard.quickSetup(req.body.provider, req.body.apiKey, req.body.options);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/setup/detect-local", async (_req, res) => {
+  try {
+    const services = await setupWizard.detectLocalServices();
+    res.json({ services });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/setup/test-connection", async (req, res) => {
+  try {
+    const result = await setupWizard.testConnection(req.body.type, req.body.config);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/setup/env-template", (_req, res) => {
+  const template = setupWizard.generateEnvTemplate();
+  res.type("text/plain").send(template);
+});
+
 app.post("/rpc", async (req, res) => {
   const { jsonrpc, method, params, id } = req.body;
   
