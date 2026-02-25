@@ -135,6 +135,203 @@ app.get("/api/hooks", (_req, res) => {
   res.json({ hooks: hooks.publicHooks() });
 });
 
+import { expertAdapter } from "./lib/expert-adapter.mjs";
+
+app.get("/api/experts", (_req, res) => {
+  res.json({ experts: expertAdapter.listExperts() });
+});
+
+app.get("/api/experts/:domainId", (req, res) => {
+  const expert = expertAdapter.getExpert(req.params.domainId);
+  if (!expert) {
+    res.status(404).json({ error: "Expert not found" });
+    return;
+  }
+  res.json({ expert });
+});
+
+app.post("/api/sessions/:sessionId/expert", (req, res) => {
+  const { sessionId } = req.params;
+  const { domainId } = req.body;
+  
+  if (!domainId) {
+    res.status(400).json({ error: "domainId is required" });
+    return;
+  }
+  
+  try {
+    const expert = expertAdapter.setExpert(sessionId, domainId);
+    res.json({ ok: true, expert });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/sessions/:sessionId/expert", (req, res) => {
+  const expert = expertAdapter.getExpert(req.params.sessionId);
+  res.json({ expert });
+});
+
+app.post("/api/experts/detect", (req, res) => {
+  const { query } = req.body;
+  if (!query) {
+    res.status(400).json({ error: "query is required" });
+    return;
+  }
+  
+  import("./lib/expert-router.mjs").then(({ expertRouter }) => {
+    const domainId = expertRouter.detectDomain(query);
+    const expert = expertRouter.getExpert(domainId);
+    res.json({ domainId, expert });
+  });
+});
+
+import { workflowEngine } from "./lib/industry-workflows.mjs";
+
+app.get("/api/workflows", (_req, res) => {
+  res.json({ industries: workflowEngine.getAllIndustries() });
+});
+
+app.get("/api/workflows/:industryId", (req, res) => {
+  const workflows = workflowEngine.getIndustryWorkflows(req.params.industryId);
+  const templates = workflowEngine.getTemplates(req.params.industryId);
+  res.json({ workflows, templates });
+});
+
+app.get("/api/workflows/:industryId/:workflowId", (req, res) => {
+  const workflow = workflowEngine.getWorkflow(req.params.industryId, req.params.workflowId);
+  if (!workflow) {
+    res.status(404).json({ error: "Workflow not found" });
+    return;
+  }
+  res.json({ workflow });
+});
+
+app.post("/api/workflows/:industryId/:workflowId/execute", (req, res) => {
+  const workflow = workflowEngine.getWorkflow(req.params.industryId, req.params.workflowId);
+  if (!workflow) {
+    res.status(404).json({ error: "Workflow not found" });
+    return;
+  }
+  const inputs = req.body || {};
+  const execution = workflowEngine.executeWorkflow(workflow, inputs);
+  res.json({ execution });
+});
+
+app.get("/api/onboarding/:industryId", (req, res) => {
+  const onboarding = workflowEngine.getOnboarding(req.params.industryId);
+  if (!onboarding) {
+    res.status(404).json({ error: "Onboarding not found" });
+    return;
+  }
+  res.json({ onboarding });
+});
+
+import { WrapperGenerator, INDUSTRY_THEMES } from "./lib/wrapper-generator.mjs";
+
+const wrapperGen = new WrapperGenerator(path.join(rootDir, "wrappers"));
+
+app.get("/api/wrappers/industries", (_req, res) => {
+  res.json({ industries: wrapperGen.listAvailableIndustries() });
+});
+
+app.get("/api/wrappers/themes", (_req, res) => {
+  res.json({ themes: INDUSTRY_THEMES });
+});
+
+app.post("/api/wrappers/generate", async (req, res) => {
+  const { industryId, name, domain, pricing } = req.body;
+  
+  if (!industryId) {
+    res.status(400).json({ error: "industryId is required" });
+    return;
+  }
+  
+  try {
+    const result = await wrapperGen.generateWrapper(industryId, { name, domain, pricing });
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+import { adapterRegistry } from "./lib/industry-adapters.mjs";
+
+app.get("/api/adapters", (_req, res) => {
+  res.json({ industries: adapterRegistry.listIndustries() });
+});
+
+app.get("/api/adapters/:industryId", (req, res) => {
+  const adapters = adapterRegistry.getIndustryAdapters(req.params.industryId);
+  res.json({ adapters });
+});
+
+app.get("/api/adapters/:industryId/:adapterId", (req, res) => {
+  const config = adapterRegistry.getAdapterConfig(req.params.industryId, req.params.adapterId);
+  if (!config) {
+    res.status(404).json({ error: "Adapter not found" });
+    return;
+  }
+  const envCheck = adapterRegistry.checkEnvConfigured(req.params.industryId, req.params.adapterId);
+  res.json({ adapter: config, envConfigured: envCheck.configured, missingEnv: envCheck.missing });
+});
+
+app.post("/api/adapters/:industryId/:adapterId/:endpoint", async (req, res) => {
+  const { industryId, adapterId, endpoint } = req.params;
+  const params = req.body || {};
+  
+  try {
+    const result = await adapterRegistry.callAdapter(industryId, adapterId, endpoint, params);
+    res.json({ ok: true, result });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+import { TerraformExecutor } from "./lib/terraform-executor.mjs";
+
+const terraformExec = new TerraformExecutor(rootDir);
+
+app.post("/api/terraform/init", async (req, res) => {
+  const config = req.body;
+  try {
+    const result = await terraformExec.init(config);
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/terraform/plan", async (req, res) => {
+  const config = req.body;
+  try {
+    const result = await terraformExec.plan(config);
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/terraform/apply", async (req, res) => {
+  const config = req.body;
+  try {
+    const result = await terraformExec.apply(config);
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/terraform/destroy", async (req, res) => {
+  const { targets } = req.body;
+  try {
+    const result = await terraformExec.destroy(targets);
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 app.post("/rpc", async (req, res) => {
   const { jsonrpc, method, params, id } = req.body;
   
