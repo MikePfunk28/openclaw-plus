@@ -347,6 +347,108 @@ app.get("/api/universal-adapters/:category", (req, res) => {
   res.json({ adapters });
 });
 
+import { telemetry, wrapModelCall } from "./lib/ai-telemetry.mjs";
+import { guardrails, GUARDRAILS, applyAwsGuardrails } from "./lib/guardrails.mjs";
+import { SERVICE_PROVISIONING, AI_SERVICES, AI_SDKS, listServiceCategories } from "./lib/service-provisioning.mjs";
+
+app.get("/api/telemetry/metrics", (_req, res) => {
+  res.json({ metrics: telemetry.getMetrics() });
+});
+
+app.get("/api/telemetry/traces", (req, res) => {
+  const traces = telemetry.searchTraces({
+    name: req.query.name,
+    status: req.query.status,
+    startTime: req.query.startTime ? parseInt(req.query.startTime) : undefined,
+    endTime: req.query.endTime ? parseInt(req.query.endTime) : undefined
+  });
+  res.json({ traces });
+});
+
+app.get("/api/telemetry/traces/:traceId", (req, res) => {
+  const trace = telemetry.getTrace(req.params.traceId);
+  if (!trace) {
+    res.status(404).json({ error: "Trace not found" });
+    return;
+  }
+  res.json({ trace });
+});
+
+app.get("/api/telemetry/generations", (req, res) => {
+  const generations = telemetry.searchGenerations({
+    model: req.query.model,
+    provider: req.query.provider,
+    status: req.query.status
+  });
+  res.json({ generations });
+});
+
+app.get("/api/telemetry/export", (req, res) => {
+  const data = telemetry.exportAll();
+  res.json(data);
+});
+
+app.get("/api/guardrails", (_req, res) => {
+  res.json({ guardrails: GUARDRAILS });
+});
+
+app.get("/api/guardrails/violations", (req, res) => {
+  const limit = parseInt(req.query.limit) || 100;
+  res.json({ violations: guardrails.getViolations(limit) });
+});
+
+app.get("/api/guardrails/audit", (req, res) => {
+  const limit = parseInt(req.query.limit) || 1000;
+  res.json({ auditLog: guardrails.getAuditLog(limit) });
+});
+
+app.post("/api/guardrails/check/input", (req, res) => {
+  const { input } = req.body;
+  if (!input) {
+    res.status(400).json({ error: "input is required" });
+    return;
+  }
+  const result = guardrails.checkInput(input);
+  res.json(result);
+});
+
+app.post("/api/guardrails/check/output", (req, res) => {
+  const { output } = req.body;
+  if (!output) {
+    res.status(400).json({ error: "output is required" });
+    return;
+  }
+  const result = guardrails.checkOutput(output);
+  res.json(result);
+});
+
+app.post("/api/guardrails/:guardrailId/enable", (req, res) => {
+  const success = guardrails.enable(req.params.guardrailId);
+  res.json({ ok: success });
+});
+
+app.post("/api/guardrails/:guardrailId/disable", (req, res) => {
+  const success = guardrails.disable(req.params.guardrailId);
+  res.json({ ok: success });
+});
+
+app.get("/api/services", (_req, res) => {
+  res.json({ categories: listServiceCategories() });
+});
+
+app.get("/api/services/:category", (req, res) => {
+  const services = SERVICE_PROVISIONING[req.params.category] || AI_SERVICES[req.params.category];
+  if (!services) {
+    res.status(404).json({ error: "Service category not found" });
+    return;
+  }
+  res.json({ services });
+});
+
+app.get("/ai-sdks", (_req, res) => {
+  res.json({ sdks: AI_SDKS });
+});
+
 app.post("/rpc", async (req, res) => {
   const { jsonrpc, method, params, id } = req.body;
   
