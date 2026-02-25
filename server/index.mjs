@@ -567,6 +567,125 @@ app.get("/api/setup/env-template", (_req, res) => {
   res.type("text/plain").send(template);
 });
 
+import { architecturePlanner } from "./lib/architecture-planner.mjs";
+import { driftPrevention } from "./lib/drift-prevention.mjs";
+
+app.get("/api/architecture/plans", (_req, res) => {
+  res.json({ plans: architecturePlanner.listPlans() });
+});
+
+app.post("/api/architecture/plans", (req, res) => {
+  const plan = architecturePlanner.createPlan(req.body);
+  res.json({ ok: true, plan });
+});
+
+app.get("/api/architecture/plans/:planId", (req, res) => {
+  const plan = architecturePlanner.getPlan(req.params.planId);
+  if (!plan) {
+    res.status(404).json({ error: "Plan not found" });
+    return;
+  }
+  res.json({ plan });
+});
+
+app.delete("/api/architecture/plans/:planId", (req, res) => {
+  const deleted = architecturePlanner.deletePlan(req.params.planId);
+  res.json({ ok: deleted });
+});
+
+app.post("/api/architecture/plans/:planId/components", (req, res) => {
+  try {
+    const component = architecturePlanner.addComponent(req.params.planId, req.body);
+    res.json({ ok: true, component });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/architecture/plans/:planId/connections", (req, res) => {
+  try {
+    const connection = architecturePlanner.addConnection(req.params.planId, req.body);
+    res.json({ ok: true, connection });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/architecture/plans/:planId/diagram", (req, res) => {
+  try {
+    const diagram = architecturePlanner.generateMermaidDiagram(req.params.planId, { type: req.query.type });
+    res.json({ ok: true, ...diagram });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/architecture/plans/:planId/infrastructure", (req, res) => {
+  try {
+    const format = req.query.format || "terraform";
+    const code = architecturePlanner.generateInfrastructureCode(req.params.planId, format);
+    res.type("text/plain").send(code);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/architecture/templates", (_req, res) => {
+  res.json({ templates: architecturePlanner.templates });
+});
+
+app.get("/api/drift/specifications", (_req, res) => {
+  res.json({ specifications: driftPrevention.listSpecifications() });
+});
+
+app.post("/api/drift/specifications", (req, res) => {
+  const spec = driftPrevention.createSpecification(req.body.planId, req.body);
+  res.json({ ok: true, spec });
+});
+
+app.get("/api/drift/specifications/:specId", (req, res) => {
+  const spec = driftPrevention.getSpecification(req.params.specId);
+  if (!spec) {
+    res.status(404).json({ error: "Specification not found" });
+    return;
+  }
+  res.json({ spec });
+});
+
+app.get("/api/drift/specifications/:specId/test-suite", (req, res) => {
+  const spec = driftPrevention.getSpecification(req.params.specId);
+  if (!spec) {
+    res.status(404).json({ error: "Specification not found" });
+    return;
+  }
+  const suiteId = spec.tests[0];
+  const suite = driftPrevention.getTestSuite(suiteId);
+  res.json({ suite });
+});
+
+app.post("/api/drift/detect", async (req, res) => {
+  try {
+    const { specId, implId } = req.body;
+    const report = await driftPrevention.detectDrift(specId, implId);
+    res.json({ ok: true, report });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/drift/reports", (_req, res) => {
+  res.json({ reports: driftPrevention.listDriftReports() });
+});
+
+app.get("/api/drift/reports/:reportId", (req, res) => {
+  const report = driftPrevention.getDriftReport(req.params.reportId);
+  if (!report) {
+    res.status(404).json({ error: "Report not found" });
+    return;
+  }
+  res.json({ report });
+});
+
 app.post("/rpc", async (req, res) => {
   const { jsonrpc, method, params, id } = req.body;
   
