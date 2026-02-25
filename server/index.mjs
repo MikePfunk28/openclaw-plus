@@ -332,6 +332,21 @@ app.post("/api/terraform/destroy", async (req, res) => {
   }
 });
 
+import { getAllAdapters, listAllAdapters } from "./lib/universal-adapters.mjs";
+
+app.get("/api/universal-adapters", (_req, res) => {
+  res.json({ adapters: listAllAdapters() });
+});
+
+app.get("/api/universal-adapters/:category", (req, res) => {
+  const adapters = getAllAdapters()[req.params.category];
+  if (!adapters) {
+    res.status(404).json({ error: "Category not found" });
+    return;
+  }
+  res.json({ adapters });
+});
+
 app.post("/rpc", async (req, res) => {
   const { jsonrpc, method, params, id } = req.body;
   
