@@ -513,7 +513,35 @@ const capabilitiesManager = new CapabilitiesManager(config, {
 
 // Apply unified auth middleware
 app.use("/api", (req, res, next) => {
-  if (req.path.startsWith("/inbound/") || req.path.startsWith("/auth/")) {
+  // Public paths - no auth required
+  const publicPaths = [
+    "/inbound/",
+    "/auth/",
+    "/health",
+    "/capabilities",
+    "/doctor",
+    "/skills",
+    "/models",
+    "/catalog/all",
+    "/connections/status",
+    "/universal-adapters",
+    "/adapters",
+    "/ml/training-types",
+    "/ml/network-types",
+    "/ml/environments",
+    "/ml/providers",
+    "/ml/methods",
+    "/ml/",
+    "/training/",
+    "/lsp/",
+    "/ast/",
+    "/integrations",
+    "/users",
+    "/roles",
+    "/openclaw/",
+  ];
+  const isPublic = publicPaths.some((p) => req.path.startsWith(p) || req.originalUrl?.startsWith(`/api${p}`));
+  if (isPublic) {
     next();
     return;
   }
@@ -522,9 +550,14 @@ app.use("/api", (req, res, next) => {
 
 // User endpoint (requires auth)
 app.get("/api/me", (req, res) => {
+  // Look up full user to get email
+  const fullUser = userManager.getUserById
+    ? userManager.getUserById(req.auth.userId)
+    : null;
   res.json({
     user: {
       id: req.auth.userId,
+      email: fullUser?.email || req.auth.email || null,
       name: req.auth.name,
       role: req.auth.role,
       policy: req.auth.policy,
@@ -797,7 +830,7 @@ app.get("/api/catalog/all", async (_req, res) => {
         universalAdapters: listAllAdapters().length,
         industryAdapters: adapterRegistry.listIndustries().length,
         lspServers: lspManager.listServers().length,
-        astParsers: astManager.listParsers().length
+        astParsers: astManager.listParsers().length,
       },
       skills: skills.publicSkills(),
       mcpTools: mcp.publicTools(),
@@ -810,7 +843,7 @@ app.get("/api/catalog/all", async (_req, res) => {
       environments: mlPlatform.getEnvironments(),
       cloudTrainingProviders: aiTraining.getProviders(),
       trainingMethods: aiTraining.getMethods(),
-      connections: connectionStatus
+      connections: connectionStatus,
     });
   } catch (error) {
     res.status(500).json({ error: String(error?.message || error) });
@@ -2417,3 +2450,505 @@ const discordHandle = await startDiscordAdapter({
 if (discordHandle) {
   adapterHandles.push(discordHandle);
 }
+
+// ---------------------------------------------------------------------------
+// RabbitMQ Adapter Routes
+// ---------------------------------------------------------------------------
+import {
+  getRabbitMQAdapter,
+  getRabbitMQBridge,
+  checkRabbitMQAvailable,
+  EXCHANGE_TYPES,
+} from "./lib/rabbitmq-adapter.mjs";
+import {
+  getEnvBootstrapper,
+  ENV_TYPES as BOOT_ENV_TYPES,
+} from "./lib/env-bootstrapper.mjs";
+
+const rabbitMQ = getRabbitMQAdapter();
+const rabbitBridge = getRabbitMQBridge();
+const envBootstrapper = getEnvBootstrapper(rootDir);
+
+// Attempt RabbitMQ connection if configured
+if (process.env.RABBITMQ_URL) {
+  rabbitMQ
+    .connect()
+    .then(() => console.log("[rabbitmq] Connected"))
+    .catch((err) => console.warn("[rabbitmq] Not connected:", err.message));
+}
+
+app.get("/api/rabbitmq/status", (_req, res) => {
+  res.json({ ok: true, status: rabbitMQ.getStatus() });
+});
+
+app.post("/api/rabbitmq/connect", async (_req, res) => {
+  try {
+    const result = await rabbitMQ.connect();
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/rabbitmq/disconnect", async (_req, res) => {
+  try {
+    const result = await rabbitMQ.disconnect();
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/rabbitmq/check", async (_req, res) => {
+  try {
+    const result = await checkRabbitMQAvailable();
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/rabbitmq/exchange", async (req, res) => {
+  try {
+    const { exchange, type, options } = req.body;
+    if (!exchange)
+      return res.status(400).json({ error: "exchange is required" });
+    const result = await rabbitMQ.assertExchange(
+      exchange,
+      type || EXCHANGE_TYPES.TOPIC,
+      options || {},
+    );
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/rabbitmq/queue", async (req, res) => {
+  try {
+    const { queue, options } = req.body;
+    if (!queue) return res.status(400).json({ error: "queue is required" });
+    const result = await rabbitMQ.assertQueue(queue, options || {});
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.delete("/api/rabbitmq/queue/:queue", async (req, res) => {
+  try {
+    const result = await rabbitMQ.deleteQueue(req.params.queue);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/rabbitmq/queue/:queue/purge", async (req, res) => {
+  try {
+    const result = await rabbitMQ.purgeQueue(req.params.queue);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/rabbitmq/queue/:queue/check", async (req, res) => {
+  try {
+    const result = await rabbitMQ.checkQueue(req.params.queue);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/rabbitmq/publish", async (req, res) => {
+  try {
+    const { exchange, routingKey, message, options } = req.body;
+    if (!exchange || !routingKey || message === undefined) {
+      return res
+        .status(400)
+        .json({ error: "exchange, routingKey and message are required" });
+    }
+    const result = await rabbitMQ.publish(
+      exchange,
+      routingKey,
+      message,
+      options || {},
+    );
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/rabbitmq/send", async (req, res) => {
+  try {
+    const { queue, message, options } = req.body;
+    if (!queue || message === undefined) {
+      return res.status(400).json({ error: "queue and message are required" });
+    }
+    const result = await rabbitMQ.sendToQueue(queue, message, options || {});
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/rabbitmq/subscribe", async (req, res) => {
+  try {
+    const { exchange, routingKey, options } = req.body;
+    if (!exchange || !routingKey) {
+      return res
+        .status(400)
+        .json({ error: "exchange and routingKey are required" });
+    }
+    // Subscribe and forward to a server-side buffer (polling via /messages)
+    const messages = [];
+    const result = await rabbitMQ.subscribe(
+      exchange,
+      routingKey,
+      async (envelope) => {
+        messages.push({
+          content: envelope.content,
+          fields: envelope.fields,
+          ts: Date.now(),
+        });
+        envelope.ack();
+      },
+      options || {},
+    );
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/rabbitmq/subscriptions", (_req, res) => {
+  res.json({ ok: true, subscriptions: rabbitMQ.listSubscriptions() });
+});
+
+app.delete("/api/rabbitmq/subscriptions/:id", async (req, res) => {
+  try {
+    const result = await rabbitMQ.unsubscribe(req.params.id);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/rabbitmq/dlq/setup", async (req, res) => {
+  try {
+    const { originalQueue, dlxExchange, dlqName } = req.body;
+    if (!originalQueue)
+      return res.status(400).json({ error: "originalQueue is required" });
+    const result = await rabbitMQ.setupDeadLetterQueue(
+      originalQueue,
+      dlxExchange,
+      dlqName,
+    );
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/rabbitmq/bridge/status", (_req, res) => {
+  res.json({ ok: true, status: rabbitBridge.getStatus() });
+});
+
+// ---------------------------------------------------------------------------
+// Environment Bootstrapper Routes
+// ---------------------------------------------------------------------------
+
+app.get("/api/env/tools", async (_req, res) => {
+  try {
+    const result = await envBootstrapper.checkAvailability();
+    res.json({ ok: true, tools: result.tools });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/env/system-info", async (_req, res) => {
+  try {
+    const result = await envBootstrapper.getSystemInfo();
+    res.json({ ok: true, info: result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/env/types", (_req, res) => {
+  res.json({ ok: true, types: Object.values(BOOT_ENV_TYPES) });
+});
+
+app.post("/api/env/python/venv", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createPythonVenv(req.body);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/conda", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createCondaEnv(req.body);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/env/conda/list", async (_req, res) => {
+  try {
+    const result = await envBootstrapper.listCondaEnvs();
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/conda/export", async (req, res) => {
+  try {
+    const { name, outputPath } = req.body;
+    if (!name) return res.status(400).json({ error: "name is required" });
+    const result = await envBootstrapper.exportCondaEnv(name, outputPath);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/node", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createNodeProject(req.body);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/vite", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createNodeProject({
+      ...req.body,
+      framework: "vite",
+    });
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/tanstack", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createNodeProject({
+      ...req.body,
+      framework: "tanstack",
+    });
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/next", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createNodeProject({
+      ...req.body,
+      framework: "next",
+    });
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/docker", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createDockerProject(req.body);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/kubernetes", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createKubernetesProject(req.body);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/wasm", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createWasmProject(req.body);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/assemblyscript", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createAssemblyScriptProject(req.body);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/env/rust-wasm", async (req, res) => {
+  try {
+    const result = await envBootstrapper.createRustWasmProject(req.body);
+    res.json({ ok: true, result });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/env/jobs", (_req, res) => {
+  const jobs = envBootstrapper.listJobs().map((j) => ({
+    id: j.id,
+    type: j.type,
+    name: j.name,
+    status: j.status,
+    startedAt: j.startedAt,
+    completedAt: j.completedAt,
+    error: j.error || null,
+  }));
+  res.json({ ok: true, jobs });
+});
+
+app.get("/api/env/jobs/:id", (req, res) => {
+  const job = envBootstrapper.getJob(req.params.id);
+  if (!job) return res.status(404).json({ ok: false, error: "Job not found" });
+  res.json({ ok: true, job });
+});
+
+// ---------------------------------------------------------------------------
+// PM Tools Routes (project management workspace)
+// ---------------------------------------------------------------------------
+
+app.get("/api/pm/projects", async (req, res) => {
+  try {
+    const skill = skills.skills.get("pm_tools");
+    if (!skill)
+      return res.status(404).json({ error: "pm_tools skill not loaded" });
+    const result = await skill.run({
+      input: { action: "project:list", filter: req.query },
+      workspaceRoot: rootDir,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post("/api/pm/projects", async (req, res) => {
+  try {
+    const skill = skills.skills.get("pm_tools");
+    if (!skill)
+      return res.status(404).json({ error: "pm_tools skill not loaded" });
+    const result = await skill.run({
+      input: { action: "project:create", data: req.body },
+      workspaceRoot: rootDir,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/pm/projects/:id", async (req, res) => {
+  try {
+    const skill = skills.skills.get("pm_tools");
+    if (!skill)
+      return res.status(404).json({ error: "pm_tools skill not loaded" });
+    const result = await skill.run({
+      input: { action: "project:get", id: req.params.id },
+      workspaceRoot: rootDir,
+    });
+    if (!result.ok) return res.status(404).json(result);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/pm/projects/:id/summary", async (req, res) => {
+  try {
+    const skill = skills.skills.get("pm_tools");
+    if (!skill)
+      return res.status(404).json({ error: "pm_tools skill not loaded" });
+    const result = await skill.run({
+      input: { action: "project:summary", id: req.params.id },
+      workspaceRoot: rootDir,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.patch("/api/pm/projects/:id", async (req, res) => {
+  try {
+    const skill = skills.skills.get("pm_tools");
+    if (!skill)
+      return res.status(404).json({ error: "pm_tools skill not loaded" });
+    const result = await skill.run({
+      input: { action: "project:update", id: req.params.id, data: req.body },
+      workspaceRoot: rootDir,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.delete("/api/pm/projects/:id", async (req, res) => {
+  try {
+    const skill = skills.skills.get("pm_tools");
+    if (!skill)
+      return res.status(404).json({ error: "pm_tools skill not loaded" });
+    const result = await skill.run({
+      input: { action: "project:delete", id: req.params.id },
+      workspaceRoot: rootDir,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// PM generic action endpoint - pass-through to pm_tools skill
+app.post("/api/pm/action", async (req, res) => {
+  try {
+    const skill = skills.skills.get("pm_tools");
+    if (!skill)
+      return res.status(404).json({ error: "pm_tools skill not loaded" });
+    const result = await skill.run({ input: req.body, workspaceRoot: rootDir });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get("/api/pm/kpis", async (req, res) => {
+  try {
+    const skill = skills.skills.get("pm_tools");
+    if (!skill)
+      return res.status(404).json({ error: "pm_tools skill not loaded" });
+    const result = await skill.run({
+      input: { action: "analytics:kpis", projectId: req.query.projectId },
+      workspaceRoot: rootDir,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
