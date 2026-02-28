@@ -82,7 +82,7 @@ export const INDUSTRY_WORKFLOWS = {
         template: `Hi {first_name},
 
 Following up on our conversation about your home search in {area}. Based on your criteria:
-- Budget: ${budget}
+- Budget: {budget}
 - Bedrooms: {bedrooms}+
 - Preferred areas: {areas}
 
@@ -487,7 +487,7 @@ POSITION DETAILS:
 - Start Date: {start_date}
 
 COMPENSATION:
-- Base Salary: ${salary} per year
+- Base Salary: {salary} per year
 - Bonus: {bonus_structure}
 
 BENEFITS:

@@ -9,7 +9,9 @@
     "start": "node server/index.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "smoke:api": "node scripts/api-smoke.mjs",
-    "mcp:bridge": "node scripts/openclaw-mcp-bridge.mjs"
+    "mcp:bridge": "node scripts/openclaw-mcp-bridge.mjs",
+    "doctor": "node scripts/doctor.mjs",
+    "capabilities": "node scripts/capabilities.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.5",

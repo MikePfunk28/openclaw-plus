@@ -1,0 +1,33 @@
+{
+  "id": "spec-1771971049935",
+  "version": "1.0.0",
+  "created": "2026-02-24T22:10:49.936Z",
+  "updated": "2026-02-24T22:10:49.936Z",
+  "title": "Test Spec",
+  "description": "",
+  "status": "draft",
+  "requirements": [
+    {
+      "id": "REQ-2NCDELNUH",
+      "text": "Req 1",
+      "priority": "medium",
+      "status": "pending",
+      "createdAt": "2026-02-24T22:10:49.936Z"
+    },
+    {
+      "id": "REQ-2VIKAMRXI",
+      "text": "Req 2",
+      "priority": "medium",
+      "status": "pending",
+      "createdAt": "2026-02-24T22:10:49.936Z"
+    }
+  ],
+  "userStories": [],
+  "apiSpecs": [],
+  "dataModels": [],
+  "acceptanceCriteria": [],
+  "implementationPlan": null,
+  "dependencies": [],
+  "risks": [],
+  "estimates": null
+}

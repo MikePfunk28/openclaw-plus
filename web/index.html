@@ -4,119 +4,2709 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OpenClaw Plus - AI Agent Control Plane</title>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <link href="styles.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --primary-light: #818cf8;
+            --secondary: #10b981;
+            --accent: #f59e0b;
+            --danger: #ef4444;
+            --warning: #f97316;
+            --success: #22c55e;
+            --bg-dark: #0f172a;
+            --bg-darker: #020617;
+            --bg-card: #1e293b;
+            --bg-card-hover: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border: #334155;
+            --border-light: #475569;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            --radius: 12px;
+            --radius-sm: 8px;
+            --radius-lg: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-darker);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-dark);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            height: 100vh;
+            z-index: 100;
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .logo-text {
+            font-size: 20px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--text-primary), var(--primary-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            margin-bottom: 24px;
+        }
+
+        .nav-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-muted);
+            padding: 8px 12px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-card);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .nav-item i {
+            width: 20px;
+            text-align: center;
+        }
+
+        .nav-item-badge {
+            margin-left: auto;
+            background: var(--primary);
+            color: white;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            margin-left: 280px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            height: 64px;
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 24px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .top-bar-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .top-bar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .model-selector {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 8px 16px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+            min-width: 200px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Page Content */
+        .page-content {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            justify-content: center;
+        }
+
+        /* Chat Interface */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 112px);
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .message {
+            margin-bottom: 24px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .message-avatar.user {
+            background: var(--primary);
+        }
+
+        .message-avatar.assistant {
+            background: var(--secondary);
+        }
+
+        .message-role {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .message-content {
+            padding-left: 44px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .message-content pre {
+            background: var(--bg-darker);
+            padding: 16px;
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+            margin: 12px 0;
+        }
+
+        .message-content code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+        }
+
+        .chat-input-area {
+            padding: 20px;
+            border-top: 1px solid var(--border);
+            background: var(--bg-darker);
+            border-radius: 0 0 var(--radius) var(--radius);
+        }
+
+        .chat-input-container {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px 18px;
+            color: var(--text-primary);
+            font-size: 14px;
+            resize: none;
+            min-height: 52px;
+            max-height: 200px;
+            line-height: 1.5;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .chat-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Skills Grid */
+        .skills-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+
+        .skill-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .skill-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .skill-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .skill-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            background: var(--bg-card-hover);
+        }
+
+        .skill-name {
+            font-weight: 600;
+            font-size: 15px;
+        }
+
+        .skill-description {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Agent Cards */
+        .agent-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+
+        .agent-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .agent-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .agent-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+        }
+
+        .agent-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+
+        .agent-model {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .agent-stats {
+            display: flex;
+            gap: 24px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Setup Wizard */
+        .setup-wizard {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .setup-steps {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            position: relative;
+        }
+
+        .setup-steps::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 40px;
+            right: 40px;
+            height: 2px;
+            background: var(--border);
+        }
+
+        .setup-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .setup-step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg-card);
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .setup-step.active .setup-step-number {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .setup-step.completed .setup-step-number {
+            background: var(--success);
+            border-color: var(--success);
+        }
+
+        .setup-step-label {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .setup-step.active .setup-step-label {
+            color: var(--text-primary);
+        }
+
+        .setup-form {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 32px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .provider-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .provider-card {
+            padding: 16px;
+            background: var(--bg-darker);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .provider-card:hover {
+            border-color: var(--primary-light);
+        }
+
+        .provider-card.selected {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .provider-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .provider-logo {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .provider-name {
+            font-weight: 600;
+        }
+
+        .provider-status {
+            font-size: 12px;
+            color: var(--success);
+        }
+
+        /* Architecture Diagram */
+        .diagram-container {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 24px;
+            min-height: 400px;
+        }
+
+        .diagram-toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .diagram-canvas {
+            min-height: 500px;
+            background: var(--bg-darker);
+            border-radius: var(--radius-sm);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Drift Report */
+        .drift-alert {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            padding: 16px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--danger);
+            border-radius: var(--radius-sm);
+            margin-bottom: 16px;
+        }
+
+        .drift-alert-icon {
+            width: 24px;
+            height: 24px;
+            color: var(--danger);
+        }
+
+        .drift-alert-content {
+            flex: 1;
+        }
+
+        .drift-alert-title {
+            font-weight: 600;
+            color: var(--danger);
+            margin-bottom: 4px;
+        }
+
+        .drift-alert-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .drift-fix {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--bg-darker);
+            border-radius: var(--radius-sm);
+        }
+
+        .drift-fix-header {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 8px;
+            color: var(--secondary);
+        }
+
+        .drift-fix-steps {
+            list-style: none;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .drift-fix-steps li {
+            padding: 4px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .drift-fix-steps li::before {
+            content: '→';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+        }
+
+        /* Metrics */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .metric-label {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .metric-change {
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        .metric-change.positive {
+            color: var(--success);
+        }
+
+        .metric-change.negative {
+            color: var(--danger);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        .tab {
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text-secondary);
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 240px;
+            }
+            .main-content {
+                margin-left: 240px;
+            }
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                display: none;
+            }
+            .main-content {
+                margin-left: 0;
+            }
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-darker);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-light);
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 24px;
+            z-index: 1000;
+        }
+
+        .toast {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 16px 20px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow-lg);
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .toast-success { border-left: 3px solid var(--success); }
+        .toast-error { border-left: 3px solid var(--danger); }
+        .toast-warning { border-left: 3px solid var(--warning); }
+
+        /* Loading */
+        .loading-dots {
+            display: inline-flex;
+            gap: 4px;
+        }
+
+        .loading-dots span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--primary);
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        /* Hidden */
+        .hidden { display: none !important; }
+    </style>
 </head>
 <body>
-    <div class="bg-glow"></div>
-    
-    <div class="app-shell">
-        <!-- Left Sidebar -->
+    <div class="app-container">
+        <!-- Sidebar -->
         <aside class="sidebar">
-            <div class="brand">
-                <div class="badge"></div>
-                <div>
-                    <h1>OpenClaw Plus</h1>
-                    <p>AI Agent Control Plane</p>
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">⚡</div>
+                    <span class="logo-text">OpenClaw Plus</span>
                 </div>
             </div>
 
-            <section>
-                <h2>Connection</h2>
-                <div id="connectionStatus" class="connection-status offline">offline</div>
-                <div style="display: flex; gap: 8px; margin-top: 8px;">
-                    <button id="reconnectBtn">Reconnect</button>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-section-title">Main</div>
+                    <div class="nav-item active" data-page="chat">
+                        <i class="fas fa-comments"></i>
+                        <span>Chat</span>
+                    </div>
+                    <div class="nav-item" data-page="agents">
+                        <i class="fas fa-robot"></i>
+                        <span>Agents</span>
+                        <span class="nav-item-badge">3</span>
+                    </div>
+                    <div class="nav-item" data-page="skills">
+                        <i class="fas fa-puzzle-piece"></i>
+                        <span>Skills</span>
+                        <span class="nav-item-badge">50+</span>
+                    </div>
                 </div>
-            </section>
 
-            <section>
-                <h2>Auth Token</h2>
-                <input type="password" id="tokenInput" placeholder="Bearer token (optional)">
-            </section>
-
-            <section>
-                <div class="heading-row">
-                    <h2>Model</h2>
+                <div class="nav-section">
+                    <div class="nav-section-title">Architecture</div>
+                    <div class="nav-item" data-page="architect">
+                        <i class="fas fa-drafting-compass"></i>
+                        <span>Planner</span>
+                    </div>
+                    <div class="nav-item" data-page="diagrams">
+                        <i class="fas fa-project-diagram"></i>
+                        <span>Diagrams</span>
+                    </div>
+                    <div class="nav-item" data-page="drift">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>Drift Prevention</span>
+                    </div>
                 </div>
-                <select id="modelSelect"></select>
-            </section>
 
-            <section>
-                <div class="heading-row">
-                    <h2>Sessions</h2>
-                    <button id="newSessionBtn">+ New</button>
+                <div class="nav-section">
+                    <div class="nav-section-title">ML Platform</div>
+                    <div class="nav-item" data-page="ml-training">
+                        <i class="fas fa-brain"></i>
+                        <span>Training</span>
+                    </div>
+                    <div class="nav-item" data-page="ml-datasets">
+                        <i class="fas fa-database"></i>
+                        <span>Datasets</span>
+                    </div>
+                    <div class="nav-item" data-page="ml-experiments">
+                        <i class="fas fa-flask"></i>
+                        <span>Experiments</span>
+                    </div>
+                    <div class="nav-item" data-page="ml-models">
+                        <i class="fas fa-cube"></i>
+                        <span>Models</span>
+                    </div>
+                    <div class="nav-item" data-page="ai-training">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>Cloud Training</span>
+                    </div>
                 </div>
-                <div id="sessionList" class="session-list"></div>
-            </section>
 
-            <section>
-                <div class="heading-row">
-                    <h2>Skills</h2>
-                    <button id="refreshBtn">Refresh</button>
+                <div class="nav-section">
+                    <div class="nav-section-title">Infrastructure</div>
+                    <div class="nav-item" data-page="infrastructure">
+                        <i class="fas fa-server"></i>
+                        <span>Infrastructure</span>
+                    </div>
+                    <div class="nav-item" data-page="adapters">
+                        <i class="fas fa-plug"></i>
+                        <span>Adapters</span>
+                    </div>
+                    <div class="nav-item" data-page="telemetry">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Telemetry</span>
+                    </div>
                 </div>
-                <div id="skillList" class="skill-list"></div>
-            </section>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Code Intelligence</div>
+                    <div class="nav-item" data-page="lsp">
+                        <i class="fas fa-code"></i>
+                        <span>LSP / Code</span>
+                    </div>
+                    <div class="nav-item" data-page="ast">
+                        <i class="fas fa-sitemap"></i>
+                        <span>AST Explorer</span>
+                    </div>
+                    <div class="nav-item" data-page="diagram-builder">
+                        <i class="fas fa-project-diagram"></i>
+                        <span>Diagram Builder</span>
+                    </div>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">Integrations</div>
+                    <div class="nav-item" data-page="integrations">
+                        <i class="fas fa-link"></i>
+                        <span>Integrations</span>
+                    </div>
+                    <div class="nav-item" data-page="openclaw">
+                        <i class="fas fa-terminal"></i>
+                        <span>OpenClaw</span>
+                    </div>
+                    <div class="nav-item" data-page="wsl">
+                        <i class="fab fa-linux"></i>
+                        <span>WSL2</span>
+                    </div>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-section-title">System</div>
+                    <div class="nav-item" data-page="setup">
+                        <i class="fas fa-cog"></i>
+                        <span>Setup</span>
+                    </div>
+                    <div class="nav-item" data-page="security">
+                        <i class="fas fa-lock"></i>
+                        <span>Security</span>
+                    </div>
+                    <div class="nav-item" data-page="users">
+                        <i class="fas fa-users"></i>
+                        <span>Users</span>
+                    </div>
+                </div>
+            </nav>
         </aside>
 
-        <!-- Main Chat Panel -->
-        <main class="main-panel">
-            <div id="chat" class="chat"></div>
-            
-            <div class="composer-wrap">
-                <div class="setting">
-                    <label>Transport Mode</label>
-                    <select id="transportModeSelect">
-                        <option value="auto">Auto (WebSocket with HTTP fallback)</option>
-                        <option value="ws">WebSocket only</option>
-                        <option value="http">HTTP streaming only</option>
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <h1 class="page-title" id="pageTitle">Chat</h1>
+                </div>
+                <div class="top-bar-right">
+                    <select class="model-selector" id="modelSelector">
+                        <option value="claude-sonnet-4.6">Claude Sonnet 4.6</option>
+                        <option value="claude-opus-4.6">Claude Opus 4.6</option>
+                        <option value="gpt-5.3">GPT-5.3</option>
+                        <option value="gpt-5.3-codex">GPT-5.3 Codex</option>
+                        <option value="gemini-3.1-pro">Gemini 3.1 Pro</option>
+                        <option value="deepseek-3.2">DeepSeek 3.2</option>
                     </select>
-                </div>
-                <div style="display: flex; gap: 8px;">
-                    <div class="setting" style="flex: 1;">
-                        <label>Max Steps</label>
-                        <input type="number" id="maxStepsInput" value="8" min="1" max="50">
-                    </div>
-                    <div class="setting" style="flex: 1;">
-                        <label>Max Cycles</label>
-                        <input type="number" id="maxCyclesInput" value="4" min="1" max="20">
+                    <div class="status-indicator">
+                        <div class="status-dot"></div>
+                        <span>Connected</span>
                     </div>
                 </div>
-                <div style="display: flex; gap: 8px;">
-                    <div class="setting" style="flex: 1;">
-                        <label>Autonomy</label>
-                        <select id="autonomyModeSelect">
-                            <option value="continuous">Continuous</option>
-                            <option value="step">Step-by-step</option>
-                        </select>
-                    </div>
-                    <div class="setting" style="flex: 1;">
-                        <label>Approval</label>
-                        <select id="approvalModeSelect">
-                            <option value="never">Never</option>
-                            <option value="always">Always</option>
-                        </select>
+            </header>
+
+            <!-- Page Content -->
+            <div class="page-content" id="pageContent">
+                <!-- Chat Page (Default) -->
+                <div class="page" id="page-chat">
+                    <div class="chat-container">
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="message">
+                                <div class="message-header">
+                                    <div class="message-avatar assistant">🤖</div>
+                                    <span class="message-role">OpenClaw Plus</span>
+                                </div>
+                                <div class="message-content">
+                                    <p>Welcome to OpenClaw Plus! I'm your AI assistant with access to 50+ skills for:</p>
+                                    <ul style="margin: 12px 0; padding-left: 24px;">
+                                        <li>💻 Code review, debugging, and development</li>
+                                        <li>📊 Data analysis and visualization</li>
+                                        <li>🏗️ Architecture planning and diagrams</li>
+                                        <li>☁️ Cloud infrastructure management</li>
+                                        <li>🔐 Security guardrails and testing</li>
+                                        <li>🤖 Multi-provider AI inference</li>
+                                    </ul>
+                                    <p>How can I help you today?</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="chat-input-area">
+                            <div class="chat-input-container">
+                                <textarea class="chat-input" id="chatInput" placeholder="Ask me anything... (Ctrl+Enter to send)" rows="1"></textarea>
+                                <button class="btn btn-primary" id="sendBtn">
+                                    <i class="fas fa-paper-plane"></i>
+                                    Send
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <textarea id="promptInput" placeholder="Enter your objective... (Ctrl+Enter to run)"></textarea>
-                <button id="sendBtn">Run Agent</button>
+
+                <!-- Agents Page -->
+                <div class="page hidden" id="page-agents">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <h2>Your Agents</h2>
+                        <button class="btn btn-primary" onclick="showAgentModal()">
+                            <i class="fas fa-plus"></i>
+                            Create Agent
+                        </button>
+                    </div>
+
+                    <div class="agent-card">
+                        <div class="agent-card-header">
+                            <div class="agent-info">
+                                <div class="agent-avatar">💻</div>
+                                <div>
+                                    <div class="agent-name">Coding Agent</div>
+                                    <div class="agent-model">GPT-5.3 Codex</div>
+                                </div>
+                            </div>
+                            <div>
+                                <button class="btn btn-secondary btn-sm">Edit</button>
+                                <button class="btn btn-primary btn-sm">Activate</button>
+                            </div>
+                        </div>
+                        <div class="agent-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">1,234</div>
+                                <div class="stat-label">Runs</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">2.1M</div>
+                                <div class="stat-label">Tokens</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">0.8s</div>
+                                <div class="stat-label">Avg Latency</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="agent-card">
+                        <div class="agent-card-header">
+                            <div class="agent-info">
+                                <div class="agent-avatar">🔍</div>
+                                <div>
+                                    <div class="agent-name">Research Agent</div>
+                                    <div class="agent-model">Gemini 3.1 Pro</div>
+                                </div>
+                            </div>
+                            <div>
+                                <button class="btn btn-secondary btn-sm">Edit</button>
+                                <button class="btn btn-primary btn-sm">Activate</button>
+                            </div>
+                        </div>
+                        <div class="agent-stats">
+                            <div class="stat-item">
+                                <div class="stat-value">567</div>
+                                <div class="stat-label">Runs</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">890K</div>
+                                <div class="stat-label">Tokens</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-value">1.2s</div>
+                                <div class="stat-label">Avg Latency</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Skills Page -->
+                <div class="page hidden" id="page-skills">
+                    <h2 style="margin-bottom: 24px;">Available Skills</h2>
+                    <div class="skills-grid" id="skillsGrid">
+                        <!-- Skills will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Architecture Planner Page -->
+                <div class="page hidden" id="page-architect">
+                    <div style="display: flex; gap: 24px;">
+                        <div style="flex: 1;">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Create Architecture Plan</h3>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Plan Name</label>
+                                    <input type="text" class="form-input" id="planName" placeholder="My Application Architecture">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Architecture Type</label>
+                                    <select class="form-input" id="planType">
+                                        <option value="microservices">Microservices</option>
+                                        <option value="serverless">Serverless</option>
+                                        <option value="monorepo">Monorepo</option>
+                                        <option value="eventDriven">Event-Driven</option>
+                                        <option value="hexagonal">Hexagonal/Clean</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Description</label>
+                                    <textarea class="form-input" id="planDescription" rows="3" placeholder="Describe what you're building..."></textarea>
+                                </div>
+                                <button class="btn btn-primary" onclick="createPlan()">
+                                    <i class="fas fa-magic"></i>
+                                    Generate Architecture
+                                </button>
+                            </div>
+                        </div>
+                        <div style="flex: 1;">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Quick Templates</h3>
+                                </div>
+                                <div class="provider-grid">
+                                    <div class="provider-card" onclick="loadTemplate('microservices')">
+                                        <div class="provider-name">🚀 Microservices</div>
+                                    </div>
+                                    <div class="provider-card" onclick="loadTemplate('serverless')">
+                                        <div class="provider-name">⚡ Serverless</div>
+                                    </div>
+                                    <div class="provider-card" onclick="loadTemplate('eventDriven')">
+                                        <div class="provider-name">📡 Event-Driven</div>
+                                    </div>
+                                    <div class="provider-card" onclick="loadTemplate('hexagonal')">
+                                        <div class="provider-name">⬡ Hexagonal</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Diagrams Page -->
+                <div class="page hidden" id="page-diagrams">
+                    <div class="diagram-container">
+                        <div class="diagram-toolbar">
+                            <button class="btn btn-secondary btn-sm"><i class="fas fa-plus"></i> Add Component</button>
+                            <button class="btn btn-secondary btn-sm"><i class="fas fa-link"></i> Add Connection</button>
+                            <button class="btn btn-secondary btn-sm"><i class="fas fa-database"></i> Database</button>
+                            <button class="btn btn-secondary btn-sm"><i class="fas fa-cloud"></i> Service</button>
+                            <button class="btn btn-secondary btn-sm"><i class="fas fa-exchange-alt"></i> Queue</button>
+                            <div style="flex: 1;"></div>
+                            <button class="btn btn-primary btn-sm" onclick="exportDiagram()"><i class="fas fa-download"></i> Export</button>
+                        </div>
+                        <div class="diagram-canvas" id="diagramCanvas">
+                            <div class="mermaid" id="mermaidDiagram">
+flowchart TB
+    A[Client] --> B[API Gateway]
+    B --> C[Auth Service]
+    B --> D[Business Logic]
+    D --> E[(Database)]
+    D --> F[Cache]
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Drift Prevention Page -->
+                <div class="page hidden" id="page-drift">
+                    <div class="tabs">
+                        <div class="tab active">Specifications</div>
+                        <div class="tab">Test Suites</div>
+                        <div class="tab">Drift Reports</div>
+                        <div class="tab">Verification</div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Active Specifications</h3>
+                            <button class="btn btn-primary btn-sm">
+                                <i class="fas fa-plus"></i> New Spec
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="drift-alert">
+                        <i class="fas fa-exclamation-triangle drift-alert-icon"></i>
+                        <div class="drift-alert-content">
+                            <div class="drift-alert-title">Critical Drift Detected</div>
+                            <div class="drift-alert-description">
+                                3 components have drifted from specification. 2 critical, 1 high priority.
+                            </div>
+                            <div class="drift-fix">
+                                <div class="drift-fix-header">Suggested Fix</div>
+                                <ul class="drift-fix-steps">
+                                    <li>Add missing validation for 'email' field in UserRegistration endpoint</li>
+                                    <li>Update response schema for GET /api/users to include 'role' field</li>
+                                    <li>Implement rate limiting on POST /api/auth/login</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Setup Page -->
+                <div class="page hidden" id="page-setup">
+                    <div class="setup-wizard">
+                        <div class="setup-steps">
+                            <div class="setup-step active">
+                                <div class="setup-step-number">1</div>
+                                <div class="setup-step-label">AI Providers</div>
+                            </div>
+                            <div class="setup-step">
+                                <div class="setup-step-number">2</div>
+                                <div class="setup-step-label">Databases</div>
+                            </div>
+                            <div class="setup-step">
+                                <div class="setup-step-number">3</div>
+                                <div class="setup-step-label">Services</div>
+                            </div>
+                            <div class="setup-step">
+                                <div class="setup-step-number">4</div>
+                                <div class="setup-step-label">Complete</div>
+                            </div>
+                        </div>
+
+                        <div class="setup-form">
+                            <h2 style="margin-bottom: 8px;">Configure AI Providers</h2>
+                            <p style="color: var(--text-muted); margin-bottom: 24px;">Add API keys for the AI providers you want to use</p>
+
+                            <div class="provider-grid">
+                                <div class="provider-card" onclick="selectProvider('anthropic')">
+                                    <div class="provider-card-header">
+                                        <span class="provider-logo">🧠</span>
+                                        <span class="provider-name">Anthropic</span>
+                                    </div>
+                                    <div class="provider-status">Not configured</div>
+                                </div>
+                                <div class="provider-card" onclick="selectProvider('openai')">
+                                    <div class="provider-card-header">
+                                        <span class="provider-logo">🤖</span>
+                                        <span class="provider-name">OpenAI</span>
+                                    </div>
+                                    <div class="provider-status">Not configured</div>
+                                </div>
+                                <div class="provider-card" onclick="selectProvider('google')">
+                                    <div class="provider-card-header">
+                                        <span class="provider-logo">💎</span>
+                                        <span class="provider-name">Google AI</span>
+                                    </div>
+                                    <div class="provider-status">Not configured</div>
+                                </div>
+                                <div class="provider-card" onclick="selectProvider('deepseek')">
+                                    <div class="provider-card-header">
+                                        <span class="provider-logo">🔮</span>
+                                        <span class="provider-name">DeepSeek</span>
+                                    </div>
+                                    <div class="provider-status">Not configured</div>
+                                </div>
+                            </div>
+
+                            <div id="providerConfig" class="hidden" style="margin-top: 24px;">
+                                <div class="form-group">
+                                    <label class="form-label">API Key</label>
+                                    <input type="password" class="form-input" id="providerApiKey" placeholder="sk-...">
+                                </div>
+                                <button class="btn btn-primary" onclick="saveProviderConfig()">
+                                    <i class="fas fa-check"></i>
+                                    Save & Continue
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Telemetry Page -->
+                <div class="page hidden" id="page-telemetry">
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-value" id="totalRequests">12,456</div>
+                            <div class="metric-label">Total Requests</div>
+                            <div class="metric-change positive">↑ 12% from last week</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="totalTokens">2.4M</div>
+                            <div class="metric-label">Tokens Used</div>
+                            <div class="metric-change positive">↓ 5% efficiency gain</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="avgLatency">0.8s</div>
+                            <div class="metric-label">Avg Latency</div>
+                            <div class="metric-change positive">↓ 15% faster</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-value" id="errorRate">0.2%</div>
+                            <div class="metric-label">Error Rate</div>
+                            <div class="metric-change positive">↓ 50% reduction</div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Recent Traces</h3>
+                            <button class="btn btn-secondary btn-sm">View All</button>
+                        </div>
+                        <div id="tracesList">
+                            <!-- Traces will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Infrastructure Page -->
+                <div class="page hidden" id="page-infrastructure">
+                    <h2 style="margin-bottom: 24px;">Infrastructure</h2>
+                    <div class="card" style="margin-bottom: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Connection Status</h3>
+                            <button class="btn btn-secondary btn-sm" onclick="loadInfrastructure()">Refresh</button>
+                        </div>
+                        <div id="connectionStatusPanel" style="padding: 16px;">
+                            <p style="color: var(--text-muted);">Loading...</p>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Catalog Summary</h3>
+                        </div>
+                        <div id="catalogSummary" style="padding: 16px;"></div>
+                    </div>
+                </div>
+
+                <!-- Adapters Page -->
+                <div class="page hidden" id="page-adapters">
+                    <h2 style="margin-bottom: 24px;">Adapters</h2>
+                    <div id="adaptersGrid" class="skills-grid">
+                        <p style="color: var(--text-muted);">Loading adapters...</p>
+                    </div>
+                </div>
+
+                <!-- LSP Page -->
+                <div class="page hidden" id="page-lsp">
+                    <h2 style="margin-bottom: 24px;">Language Server Protocol</h2>
+                    <div class="card" style="margin-bottom: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Available Language Servers</h3>
+                            <button class="btn btn-primary btn-sm" onclick="refreshLspServers()">Refresh</button>
+                        </div>
+                        <div id="lspServersGrid" class="skills-grid" style="margin-top: 16px;">
+                            <!-- LSP servers loaded here -->
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Diagnostics</h3>
+                        </div>
+                        <div id="lspDiagnostics" style="font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto;">
+                            <p style="color: var(--text-muted);">Open a file to see diagnostics...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AST Page -->
+                <div class="page hidden" id="page-ast">
+                    <h2 style="margin-bottom: 24px;">AST Explorer</h2>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Source Code</h3>
+                            </div>
+                            <textarea id="astSource" style="width: 100%; height: 300px; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-family: monospace; font-size: 13px; color: var(--text-primary); resize: none;" placeholder="Paste code here or enter file path..."></textarea>
+                            <div style="margin-top: 12px; display: flex; gap: 8px;">
+                                <input type="text" id="astFilePath" placeholder="File path (optional)" style="flex: 1; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                <button class="btn btn-primary" onclick="parseAst()">Parse</button>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">AST Output</h3>
+                                <select id="astOutputFormat" style="background: var(--bg-darker); border: 1px solid var(--border); border-radius: 4px; padding: 4px 8px; color: var(--text-primary);">
+                                    <option value="ast">Full AST</option>
+                                    <option value="symbols">Symbols</option>
+                                    <option value="structure">Structure</option>
+                                    <option value="dependencies">Dependencies</option>
+                                </select>
+                            </div>
+                            <pre id="astOutput" style="height: 300px; overflow: auto; background: var(--bg-darker); padding: 12px; border-radius: 8px; font-size: 11px;"></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Diagram Builder Page -->
+                <div class="page hidden" id="page-diagram-builder">
+                    <h2 style="margin-bottom: 24px;">Architecture Diagram Builder</h2>
+                    <div class="card" style="padding: 0; overflow: hidden;">
+                        <div id="diagramContainer" style="width: 100%; height: 600px;"></div>
+                    </div>
+                    <div style="margin-top: 16px; display: flex; gap: 8px;">
+                        <button class="btn btn-secondary" onclick="exportDiagram()">Export JSON</button>
+                        <button class="btn btn-secondary" onclick="exportMermaid()">Export Mermaid</button>
+                        <button class="btn btn-secondary" onclick="clearDiagram()">Clear</button>
+                    </div>
+                </div>
+
+                <!-- Integrations Page -->
+                <div class="page hidden" id="page-integrations">
+                    <h2 style="margin-bottom: 24px;">Integrations</h2>
+                    <div id="integrationsGrid" class="skills-grid">
+                        <!-- Integrations loaded here -->
+                    </div>
+                </div>
+
+                <!-- OpenClaw Page -->
+                <div class="page hidden" id="page-openclaw">
+                    <h2 style="margin-bottom: 24px;">OpenClaw Integration</h2>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Gateway Status</h3>
+                            </div>
+                            <div id="openclawStatus">
+                                <p style="color: var(--text-muted);">Loading...</p>
+                            </div>
+                            <div style="margin-top: 16px; display: flex; gap: 8px;">
+                                <button class="btn btn-primary" onclick="startOpenclawGateway()">Start Gateway</button>
+                                <button class="btn btn-secondary" onclick="stopOpenclawGateway()">Stop Gateway</button>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Channels</h3>
+                            </div>
+                            <div id="openclawChannels">
+                                <p style="color: var(--text-muted);">Loading...</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card" style="margin-top: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Available Skills</h3>
+                        </div>
+                        <div id="openclawSkills" class="skills-grid" style="margin-top: 16px;">
+                            <!-- Skills loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WSL Page -->
+                <div class="page hidden" id="page-wsl">
+                    <h2 style="margin-bottom: 24px;">WSL2 Manager</h2>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Distributions</h3>
+                                <button class="btn btn-secondary btn-sm" onclick="refreshWslDistros()">Refresh</button>
+                            </div>
+                            <div id="wslDistros">
+                                <p style="color: var(--text-muted);">Loading...</p>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">System Info</h3>
+                            </div>
+                            <div id="wslSystemInfo">
+                                <p style="color: var(--text-muted);">Select a distro to see system info</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card" style="margin-top: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Terminal</h3>
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                            <select id="wslDistroSelect" style="background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                <option value="">Default</option>
+                            </select>
+                            <input type="text" id="wslCommand" placeholder="Enter command..." style="flex: 1; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);" onkeypress="if(event.key==='Enter')executeWslCommand()">
+                            <button class="btn btn-primary" onclick="executeWslCommand()">Run</button>
+                        </div>
+                        <pre id="wslOutput" style="height: 250px; overflow: auto; background: var(--bg-darker); padding: 12px; border-radius: 8px; font-size: 12px; font-family: monospace;"></pre>
+                    </div>
+                </div>
+
+                <!-- Users Page -->
+                <div class="page hidden" id="page-users">
+                    <h2 style="margin-bottom: 24px;">User Management</h2>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                        <div></div>
+                        <button class="btn btn-primary" onclick="showCreateUserModal()">+ Add User</button>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Users</h3>
+                        </div>
+                        <div id="usersList" style="overflow-x: auto;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid var(--border);">
+                                        <th style="text-align: left; padding: 12px;">Email</th>
+                                        <th style="text-align: left; padding: 12px;">Name</th>
+                                        <th style="text-align: left; padding: 12px;">Role</th>
+                                        <th style="text-align: left; padding: 12px;">Last Login</th>
+                                        <th style="text-align: right; padding: 12px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="usersTableBody">
+                                    <!-- Users loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card" style="margin-top: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Roles & Permissions</h3>
+                        </div>
+                        <div id="rolesList" class="skills-grid" style="margin-top: 16px;">
+                            <!-- Roles loaded here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ML Training Page -->
+                <div class="page hidden" id="page-ml-training">
+                    <h2 style="margin-bottom: 24px;">ML Training Platform</h2>
+                    <div style="display: grid; grid-template-columns: 300px 1fr; gap: 24px;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">Training Types</h3>
+                            </div>
+                            <div id="trainingTypesList" style="max-height: 400px; overflow-y: auto;">
+                                <!-- Training types loaded here -->
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card" style="margin-bottom: 24px;">
+                                <div class="card-header">
+                                    <h3 class="card-title">Create Training Job</h3>
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px;">
+                                    <div>
+                                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Job Name</label>
+                                        <input type="text" id="trainingJobName" placeholder="My training job" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Training Type</label>
+                                        <select id="trainingTypeSelect" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                            <option value="sft">Supervised Fine-Tuning</option>
+                                            <option value="rlhf">RLHF</option>
+                                            <option value="dpo">DPO</option>
+                                            <option value="unsupervised">Unsupervised</option>
+                                            <option value="semi_supervised">Semi-Supervised</option>
+                                            <option value="self_supervised">Self-Supervised</option>
+                                            <option value="transfer">Transfer Learning</option>
+                                            <option value="distillation">Knowledge Distillation</option>
+                                            <option value="meta">Meta-Learning</option>
+                                            <option value="continual">Continual Learning</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Network Architecture</label>
+                                        <select id="networkTypeSelect" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                            <option value="transformer">Transformer</option>
+                                            <option value="mamba">Mamba / SSM</option>
+                                            <option value="moe">Mixture of Experts</option>
+                                            <option value="diffusion">Diffusion</option>
+                                            <option value="cnn">CNN</option>
+                                            <option value="gan">GAN</option>
+                                            <option value="vae">VAE</option>
+                                            <option value="graph_nn">Graph NN</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Dataset</label>
+                                        <select id="datasetSelect" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                            <option value="">Select dataset...</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Epochs</label>
+                                        <input type="number" id="trainingEpochs" value="3" min="1" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Learning Rate</label>
+                                        <input type="text" id="trainingLR" value="2e-5" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Batch Size</label>
+                                        <input type="number" id="trainingBatchSize" value="8" min="1" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                    </div>
+                                    <div>
+                                        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Environment</label>
+                                        <select id="trainingEnv" style="width: 100%; background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                            <option value="lightning">Lightning AI</option>
+                                            <option value="wandb">Weights & Biases</option>
+                                            <option value="mlflow">MLflow</option>
+                                            <option value="jupyter">Jupyter</option>
+                                            <option value="colab">Google Colab</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div style="padding: 0 16px 16px; display: flex; gap: 8px;">
+                                    <button class="btn btn-primary" onclick="createTrainingJob()">Create Job</button>
+                                    <button class="btn btn-secondary" onclick="estimateResources()">Estimate Resources</button>
+                                </div>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3 class="card-title">Active Jobs</h3>
+                                </div>
+                                <div id="trainingJobsList">
+                                    <!-- Jobs loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ML Datasets Page -->
+                <div class="page hidden" id="page-ml-datasets">
+                    <h2 style="margin-bottom: 24px;">Datasets</h2>
+                    <div class="card" style="margin-bottom: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Upload Dataset</h3>
+                        </div>
+                        <div style="padding: 16px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+                            <input type="text" id="datasetName" placeholder="Dataset name" style="background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                            <select id="datasetType" style="background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                <option value="labeled">Labeled (SFT)</option>
+                                <option value="unlabeled">Unlabeled</option>
+                                <option value="preferences">Preferences (RLHF/DPO)</option>
+                                <option value="mixed">Mixed</option>
+                            </select>
+                            <button class="btn btn-primary" onclick="createDataset()">Create Dataset</button>
+                        </div>
+                    </div>
+                    <div id="datasetsList" class="skills-grid">
+                        <!-- Datasets loaded here -->
+                    </div>
+                </div>
+
+                <!-- ML Experiments Page -->
+                <div class="page hidden" id="page-ml-experiments">
+                    <h2 style="margin-bottom: 24px;">Experiments</h2>
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 24px;">
+                        <button class="btn btn-primary" onclick="createExperiment()">+ New Experiment</button>
+                    </div>
+                    <div id="experimentsList" class="skills-grid">
+                        <!-- Experiments loaded here -->
+                    </div>
+                </div>
+
+                <!-- ML Models Page -->
+                <div class="page hidden" id="page-ml-models">
+                    <h2 style="margin-bottom: 24px;">Models</h2>
+                    <div class="card" style="margin-bottom: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Register Model</h3>
+                        </div>
+                        <div style="padding: 16px; display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 16px;">
+                            <input type="text" id="modelName" placeholder="Model name" style="background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                            <select id="modelFramework" style="background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                <option value="pytorch">PyTorch</option>
+                                <option value="tensorflow">TensorFlow</option>
+                                <option value="jax">JAX</option>
+                                <option value="onnx">ONNX</option>
+                            </select>
+                            <input type="text" id="modelBaseModel" placeholder="Base model (optional)" style="background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                            <button class="btn btn-primary" onclick="registerModel()">Register</button>
+                        </div>
+                    </div>
+                    <div id="modelsList" class="skills-grid">
+                        <!-- Models loaded here -->
+                    </div>
+                </div>
+
+                <!-- Cloud Training Page -->
+                <div class="page hidden" id="page-ai-training">
+                    <h2 style="margin-bottom: 24px;">Cloud Training Providers</h2>
+                    <div class="card" style="margin-bottom: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Configure API Keys</h3>
+                        </div>
+                        <div style="padding: 16px; display: grid; grid-template-columns: 1fr 2fr auto; gap: 16px; align-items: end;">
+                            <select id="providerSelect" style="background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                                <option value="openai">OpenAI</option>
+                                <option value="anthropic">Anthropic</option>
+                                <option value="together">Together AI</option>
+                                <option value="replicate">Replicate</option>
+                                <option value="fireworks">Fireworks AI</option>
+                                <option value="huggingface">Hugging Face</option>
+                            </select>
+                            <input type="password" id="providerApiKey" placeholder="API Key" style="background: var(--bg-darker); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; color: var(--text-primary);">
+                            <button class="btn btn-primary" onclick="saveProviderKey()">Save</button>
+                        </div>
+                    </div>
+                    <div id="trainingProvidersList" class="skills-grid">
+                        <!-- Providers loaded here -->
+                    </div>
+                    <div class="card" style="margin-top: 24px;">
+                        <div class="card-header">
+                            <h3 class="card-title">Cloud Training Jobs</h3>
+                            <button class="btn btn-primary btn-sm" onclick="showCloudTrainingModal()">Start Cloud Training</button>
+                        </div>
+                        <div id="cloudJobsList">
+                            <!-- Cloud jobs loaded here -->
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
-
-        <!-- Right Trace Panel -->
-        <aside class="trace-panel">
-            <h2>Execution Trace</h2>
-            <div id="traceList" class="trace-list"></div>
-        </aside>
     </div>
 
-    <!-- Message Template -->
-    <template id="messageTemplate">
-        <article class="message">
-            <div class="meta"></div>
-            <div class="content"></div>
-        </article>
-    </template>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
 
-    <script src="app.js" type="module"></script>
+    <script src="/web/app.js" type="module"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark' });
+
+        // Navigation
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const page = item.dataset.page;
+                if (!page) return;
+
+                document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+
+                document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+                const targetPage = document.getElementById(`page-${page}`);
+                if (targetPage) {
+                    targetPage.classList.remove('hidden');
+                }
+
+                document.getElementById('pageTitle').textContent = item.querySelector('span').textContent;
+            });
+        });
+
+        async function refreshConnectionIndicator() {
+            const indicator = document.querySelector('.status-indicator span');
+            const dot = document.querySelector('.status-dot');
+            try {
+                const response = await fetch('/api/connections/status');
+                const data = await response.json();
+                const connectedCount = (data.providers || []).filter(p => p.connected).length;
+                indicator.textContent = connectedCount > 0 ? `Connected (${connectedCount})` : 'Not Connected';
+                dot.style.background = connectedCount > 0 ? 'var(--success)' : 'var(--danger)';
+            } catch {
+                indicator.textContent = 'Server Offline';
+                dot.style.background = 'var(--danger)';
+            }
+        }
+
+        // Chat
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const chatMessages = document.getElementById('chatMessages');
+
+        function addMessage(role, content) {
+            const message = document.createElement('div');
+            message.className = 'message';
+            message.innerHTML = `
+                <div class="message-header">
+                    <div class="message-avatar ${role}">${role === 'user' ? '👤' : '🤖'}</div>
+                    <span class="message-role">${role === 'user' ? 'You' : 'Assistant'}</span>
+                    <span class="message-time">${new Date().toLocaleTimeString()}</span>
+                </div>
+                <div class="message-content">${content}</div>
+            `;
+            chatMessages.appendChild(message);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const text = chatInput.value.trim();
+            if (!text) return;
+
+            addMessage('user', text);
+            chatInput.value = '';
+            sendBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/run/stream', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        objective: text,
+                        modelId: document.getElementById('modelSelector').value,
+                        sessionId: 'web-session'
+                    })
+                });
+
+                const data = await response.json();
+                addMessage('assistant', data.answer || data.response || 'No response');
+            } catch (error) {
+                addMessage('assistant', `Error: ${error.message}`);
+            } finally {
+                sendBtn.disabled = false;
+            }
+        }
+
+        // Toast
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check' : 'exclamation'}-circle"></i><span>${message}</span>`;
+            document.getElementById('toastContainer').appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Setup
+        let selectedProvider = null;
+
+        function selectProvider(provider) {
+            selectedProvider = provider;
+            document.querySelectorAll('.provider-card').forEach(c => c.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+            document.getElementById('providerConfig').classList.remove('hidden');
+        }
+
+        async function saveProviderConfig() {
+            const apiKey = document.getElementById('providerApiKey').value;
+            if (!apiKey) {
+                showToast('Please enter an API key', 'error');
+                return;
+            }
+
+            try {
+                await fetch('/api/setup/quick-setup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider: selectedProvider, apiKey })
+                });
+                showToast(`${selectedProvider} configured successfully!`);
+            } catch (error) {
+                showToast('Failed to save configuration', 'error');
+            }
+        }
+
+        // Load skills
+        async function loadSkills() {
+            try {
+                const response = await fetch('/api/skills');
+                const data = await response.json();
+                const grid = document.getElementById('skillsGrid');
+                grid.innerHTML = data.skills.map(skill => `
+                    <div class="skill-card">
+                        <div class="skill-card-header">
+                            <div class="skill-icon">⚡</div>
+                            <div class="skill-name">${skill.name}</div>
+                        </div>
+                        <div class="skill-description">${skill.description}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load skills:', error);
+            }
+        }
+
+        loadSkills();
+
+        // LSP Functions
+        async function refreshLspServers() {
+            try {
+                const response = await fetch('/api/lsp/servers');
+                const data = await response.json();
+                const grid = document.getElementById('lspServersGrid');
+                grid.innerHTML = data.servers.map(server => `
+                    <div class="skill-card" style="border-color: ${server.running ? 'var(--success)' : 'var(--border)'};">
+                        <div class="skill-card-header">
+                            <div class="skill-icon">${server.running ? '🟢' : '⚪'}</div>
+                            <div class="skill-name">${server.id}</div>
+                        </div>
+                        <div class="skill-description">${server.languages.join(', ')}</div>
+                        <button class="btn btn-sm ${server.running ? 'btn-secondary' : 'btn-primary'}" style="margin-top: 8px;" onclick="toggleLspServer('${server.id}', ${!server.running})">
+                            ${server.running ? 'Stop' : 'Start'}
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load LSP servers:', error);
+            }
+        }
+
+        async function toggleLspServer(serverId, start) {
+            try {
+                const endpoint = start ? '/api/lsp/start' : '/api/lsp/stop';
+                await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ serverId })
+                });
+                showToast(`${serverId} ${start ? 'started' : 'stopped'}`, 'success');
+                refreshLspServers();
+            } catch (error) {
+                showToast(`Failed to ${start ? 'start' : 'stop'} ${serverId}`, 'error');
+            }
+        }
+
+        // AST Functions
+        async function parseAst() {
+            const source = document.getElementById('astSource').value;
+            const filePath = document.getElementById('astFilePath').value || 'code.js';
+            const format = document.getElementById('astOutputFormat').value;
+            
+            try {
+                const endpoint = format === 'symbols' ? '/api/ast/symbols' :
+                                 format === 'structure' ? '/api/ast/structure' :
+                                 format === 'dependencies' ? '/api/ast/dependencies' :
+                                 '/api/ast/parse';
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filePath, content: source })
+                });
+                const data = await response.json();
+                document.getElementById('astOutput').textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('astOutput').textContent = 'Error: ' + error.message;
+            }
+        }
+
+        // Diagram Builder
+        let diagramBuilder = null;
+
+        function initDiagramBuilder() {
+            if (window.DiagramBuilder && !diagramBuilder) {
+                diagramBuilder = new DiagramBuilder('diagramContainer', {
+                    onDiagramChange: (data) => console.log('Diagram changed:', data)
+                });
+            }
+        }
+
+        function exportDiagram() {
+            if (diagramBuilder) diagramBuilder.export();
+        }
+
+        function exportMermaid() {
+            if (diagramBuilder) {
+                const mermaid = diagramBuilder.exportMermaid();
+                navigator.clipboard.writeText(mermaid);
+                showToast('Mermaid copied to clipboard!', 'success');
+            }
+        }
+
+        function clearDiagram() {
+            if (diagramBuilder) diagramBuilder.clear();
+        }
+
+        // Integrations
+        async function loadIntegrations() {
+            try {
+                const response = await fetch('/api/integrations/types');
+                const data = await response.json();
+                const grid = document.getElementById('integrationsGrid');
+                grid.innerHTML = data.types.map(int => `
+                    <div class="skill-card">
+                        <div class="skill-card-header">
+                            <div class="skill-icon">${int.icon}</div>
+                            <div class="skill-name">${int.name}</div>
+                        </div>
+                        <div class="skill-description">${int.description}</div>
+                        <button class="btn btn-primary btn-sm" style="margin-top: 8px;" onclick="configureIntegration('${int.id}')">Configure</button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load integrations:', error);
+            }
+        }
+
+        function configureIntegration(integrationId) {
+            showToast(`Configure ${integrationId} - Coming soon!`, 'info');
+        }
+
+        // OpenClaw
+        async function loadOpenclawStatus() {
+            try {
+                const response = await fetch('/api/openclaw/status');
+                const data = await response.json();
+                document.getElementById('openclawStatus').innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                        <div><strong>Version:</strong> ${data.installation?.version || 'N/A'}</div>
+                        <div><strong>Gateway:</strong> ${data.gatewayRunning ? '🟢 Running' : '⚪ Stopped'}</div>
+                        <div><strong>Agent:</strong> ${data.agentRunning ? '🟢 Running' : '⚪ Stopped'}</div>
+                        <div><strong>Profile:</strong> ${data.profile}</div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('openclawStatus').innerHTML = '<p style="color: var(--danger);">Failed to load status</p>';
+            }
+        }
+
+        async function loadOpenclawSkills() {
+            try {
+                const response = await fetch('/api/openclaw/skills');
+                const data = await response.json();
+                const grid = document.getElementById('openclawSkills');
+                grid.innerHTML = data.skills.slice(0, 12).map(skill => `
+                    <div class="skill-card">
+                        <div class="skill-card-header">
+                            <div class="skill-icon">⚡</div>
+                            <div class="skill-name">${skill.name}</div>
+                        </div>
+                        <div class="skill-description">${skill.description?.slice(0, 60) || 'No description'}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load OpenClaw skills:', error);
+            }
+        }
+
+        async function startOpenclawGateway() {
+            try {
+                await fetch('/api/openclaw/gateway/start', { method: 'POST' });
+                showToast('Gateway starting...', 'success');
+                setTimeout(loadOpenclawStatus, 2000);
+            } catch (error) {
+                showToast('Failed to start gateway', 'error');
+            }
+        }
+
+        async function stopOpenclawGateway() {
+            try {
+                await fetch('/api/openclaw/gateway/stop', { method: 'POST' });
+                showToast('Gateway stopped', 'success');
+                loadOpenclawStatus();
+            } catch (error) {
+                showToast('Failed to stop gateway', 'error');
+            }
+        }
+
+        // WSL
+        async function refreshWslDistros() {
+            try {
+                const response = await fetch('/api/skills/wsl/invoke', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'list_distros' })
+                });
+                const data = await response.json();
+                const div = document.getElementById('wslDistros');
+                const select = document.getElementById('wslDistroSelect');
+                
+                if (data.ok && data.distros) {
+                    div.innerHTML = data.distros.map(d => `
+                        <div style="display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid var(--border); cursor: pointer;" onclick="selectWslDistro('${d.name}')">
+                            <span>${d.isDefault ? '⭐ ' : ''}${d.name}</span>
+                            <span style="color: ${d.state === 'Running' ? 'var(--success)' : 'var(--text-muted)'};">${d.state}</span>
+                        </div>
+                    `).join('');
+                    
+                    select.innerHTML = '<option value="">Default</option>' + 
+                        data.distros.map(d => `<option value="${d.name}">${d.name}</option>`).join('');
+                } else {
+                    div.innerHTML = '<p style="color: var(--danger);">WSL not available</p>';
+                }
+            } catch (error) {
+                document.getElementById('wslDistros').innerHTML = '<p style="color: var(--danger);">Failed to load distros</p>';
+            }
+        }
+
+        async function selectWslDistro(distro) {
+            try {
+                const response = await fetch('/api/skills/wsl/invoke', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'system_info', distro })
+                });
+                const data = await response.json();
+                if (data.ok) {
+                    document.getElementById('wslSystemInfo').innerHTML = `
+                        <pre style="font-size: 11px; white-space: pre-wrap;">${JSON.stringify(data.system, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                console.error('Failed to get system info:', error);
+            }
+        }
+
+        async function executeWslCommand() {
+            const command = document.getElementById('wslCommand').value;
+            const distro = document.getElementById('wslDistroSelect').value;
+            
+            if (!command) return;
+            
+            try {
+                const response = await fetch('/api/skills/wsl/invoke', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'exec', command, distro: distro || undefined })
+                });
+                const data = await response.json();
+                const output = document.getElementById('wslOutput');
+                output.innerHTML += `<span style="color: var(--primary);">$ ${command}</span>\n`;
+                output.innerHTML += data.ok ? data.stdout : `<span style="color: var(--danger);">${data.error}</span>\n`;
+                output.innerHTML += '\n';
+                output.scrollTop = output.scrollHeight;
+                document.getElementById('wslCommand').value = '';
+            } catch (error) {
+                document.getElementById('wslOutput').innerHTML += `<span style="color: var(--danger);">Error: ${error.message}</span>\n`;
+            }
+        }
+
+        // Users
+        async function loadUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                const tbody = document.getElementById('usersTableBody');
+                tbody.innerHTML = data.users.map(user => `
+                    <tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 12px;">${user.email}</td>
+                        <td style="padding: 12px;">${user.name}</td>
+                        <td style="padding: 12px;"><span style="background: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 12px;">${user.role}</span></td>
+                        <td style="padding: 12px; color: var(--text-muted);">${user.lastLogin || 'Never'}</td>
+                        <td style="padding: 12px; text-align: right;">
+                            <button class="btn btn-secondary btn-sm" onclick="editUser('${user.email}')">Edit</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load users:', error);
+            }
+        }
+
+        async function loadRoles() {
+            try {
+                const response = await fetch('/api/roles');
+                const data = await response.json();
+                const grid = document.getElementById('rolesList');
+                grid.innerHTML = data.roles.map(role => `
+                    <div class="skill-card">
+                        <div class="skill-card-header">
+                            <div class="skill-icon">🔐</div>
+                            <div class="skill-name">${role.name}</div>
+                        </div>
+                        <div class="skill-description">${role.description}</div>
+                        <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">
+                            ${role.permissions.slice(0, 3).join(', ')}${role.permissions.length > 3 ? '...' : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load roles:', error);
+            }
+        }
+
+        function showCreateUserModal() {
+            const email = prompt('Enter email:');
+            if (!email) return;
+            const name = prompt('Enter name:');
+            if (!name) return;
+            const role = prompt('Enter role (admin, developer, analyst, viewer):', 'viewer');
+            
+            fetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, name, role, password: 'changeme123' })
+            }).then(() => {
+                showToast('User created!', 'success');
+                loadUsers();
+            }).catch(err => showToast('Failed to create user', 'error'));
+        }
+
+        function editUser(email) {
+            showToast('Edit user - Coming soon!', 'info');
+        }
+
+        // ML Platform Functions
+        async function loadTrainingTypes() {
+            try {
+                const response = await fetch('/api/ml/training-types');
+                const data = await response.json();
+                const div = document.getElementById('trainingTypesList');
+                div.innerHTML = data.types.map(type => `
+                    <div style="padding: 12px; border-bottom: 1px solid var(--border); cursor: pointer;" onclick="selectTrainingType('${type.id}')">
+                        <div style="font-size: 20px; margin-bottom: 4px;">${type.icon}</div>
+                        <div style="font-weight: 600;">${type.name}</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">${type.description}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load training types:', error);
+            }
+        }
+
+        function selectTrainingType(typeId) {
+            document.getElementById('trainingTypeSelect').value = typeId;
+        }
+
+        async function loadMlDatasets() {
+            try {
+                const response = await fetch('/api/ml/datasets');
+                const data = await response.json();
+                const select = document.getElementById('datasetSelect');
+                select.innerHTML = '<option value="">Select dataset...</option>' + 
+                    data.datasets.map(d => `<option value="${d.id}">${d.name} (${d.stats.totalSamples} samples)</option>`).join('');
+                
+                const grid = document.getElementById('datasetsList');
+                grid.innerHTML = data.datasets.map(ds => `
+                    <div class="skill-card">
+                        <div class="skill-card-header">
+                            <div class="skill-icon">📊</div>
+                            <div class="skill-name">${ds.name}</div>
+                        </div>
+                        <div class="skill-description">${ds.type} - ${ds.stats.totalSamples} samples</div>
+                        <div style="margin-top: 8px; font-size: 11px;">
+                            Train: ${ds.stats.trainSplit} | Val: ${ds.stats.valSplit} | Test: ${ds.stats.testSplit}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load datasets:', error);
+            }
+        }
+
+        async function createDataset() {
+            const name = document.getElementById('datasetName').value;
+            const type = document.getElementById('datasetType').value;
+            if (!name) { showToast('Enter dataset name', 'error'); return; }
+            
+            try {
+                await fetch('/api/ml/datasets', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, type, data: [] })
+                });
+                showToast('Dataset created!', 'success');
+                loadMlDatasets();
+            } catch (error) {
+                showToast('Failed to create dataset', 'error');
+            }
+        }
+
+        async function loadTrainingJobs() {
+            try {
+                const response = await fetch('/api/ml/jobs');
+                const data = await response.json();
+                const div = document.getElementById('trainingJobsList');
+                if (data.jobs.length === 0) {
+                    div.innerHTML = '<p style="color: var(--text-muted); padding: 16px;">No training jobs yet</p>';
+                    return;
+                }
+                div.innerHTML = data.jobs.map(job => `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid var(--border);">
+                        <div>
+                            <div style="font-weight: 600;">${job.name}</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">${job.trainingType} | ${job.networkType}</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <span style="color: ${job.status === 'running' ? 'var(--success)' : job.status === 'failed' ? 'var(--danger)' : 'var(--text-muted)'};">${job.status}</span>
+                            ${job.status === 'created' ? `<button class="btn btn-primary btn-sm" onclick="startTrainingJob('${job.id}')">Start</button>` : ''}
+                            ${job.status === 'running' ? `<button class="btn btn-secondary btn-sm" onclick="cancelTrainingJob('${job.id}')">Cancel</button>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load jobs:', error);
+            }
+        }
+
+        async function createTrainingJob() {
+            const config = {
+                name: document.getElementById('trainingJobName').value || 'Training Job',
+                trainingType: document.getElementById('trainingTypeSelect').value,
+                networkType: document.getElementById('networkTypeSelect').value,
+                datasetId: document.getElementById('datasetSelect').value || null,
+                hyperparameters: {
+                    epochs: parseInt(document.getElementById('trainingEpochs').value),
+                    learningRate: parseFloat(document.getElementById('trainingLR').value),
+                    batchSize: parseInt(document.getElementById('trainingBatchSize').value)
+                },
+                environment: document.getElementById('trainingEnv').value
+            };
+            
+            try {
+                const response = await fetch('/api/ml/jobs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                const data = await response.json();
+                if (data.ok) {
+                    showToast('Training job created!', 'success');
+                    loadTrainingJobs();
+                }
+            } catch (error) {
+                showToast('Failed to create job', 'error');
+            }
+        }
+
+        async function startTrainingJob(jobId) {
+            try {
+                await fetch(`/api/ml/jobs/${jobId}/start`, { method: 'POST' });
+                showToast('Training started!', 'success');
+                loadTrainingJobs();
+            } catch (error) {
+                showToast('Failed to start training', 'error');
+            }
+        }
+
+        async function cancelTrainingJob(jobId) {
+            try {
+                await fetch(`/api/ml/jobs/${jobId}/cancel`, { method: 'POST' });
+                showToast('Training cancelled', 'success');
+                loadTrainingJobs();
+            } catch (error) {
+                showToast('Failed to cancel', 'error');
+            }
+        }
+
+        async function estimateResources() {
+            const config = {
+                trainingType: document.getElementById('trainingTypeSelect').value,
+                networkType: document.getElementById('networkTypeSelect').value,
+                datasetSize: 10000,
+                modelSize: 7
+            };
+            
+            try {
+                const response = await fetch('/api/ml/estimate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                const estimate = await response.json();
+                showToast(`Est: ${estimate.gpuMemory} GPU, ${estimate.estimatedTimeHours}h, ~$${estimate.estimatedCost}`, 'info');
+            } catch (error) {
+                showToast('Failed to estimate', 'error');
+            }
+        }
+
+        async function loadExperiments() {
+            try {
+                const response = await fetch('/api/ml/experiments');
+                const data = await response.json();
+                const grid = document.getElementById('experimentsList');
+                if (data.experiments.length === 0) {
+                    grid.innerHTML = '<p style="color: var(--text-muted);">No experiments yet</p>';
+                    return;
+                }
+                grid.innerHTML = data.experiments.map(exp => `
+                    <div class="skill-card">
+                        <div class="skill-card-header">
+                            <div class="skill-icon">🧪</div>
+                            <div class="skill-name">${exp.name}</div>
+                        </div>
+                        <div class="skill-description">${exp.description || 'No description'}</div>
+                        <div style="margin-top: 8px; font-size: 11px; color: var(--text-muted);">
+                            ${exp.jobs.length} jobs | ${exp.tags.join(', ')}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load experiments:', error);
+            }
+        }
+
+        async function createExperiment() {
+            const name = prompt('Experiment name:');
+            if (!name) return;
+            const description = prompt('Description (optional):') || '';
+            
+            try {
+                await fetch('/api/ml/experiments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, description })
+                });
+                showToast('Experiment created!', 'success');
+                loadExperiments();
+            } catch (error) {
+                showToast('Failed to create experiment', 'error');
+            }
+        }
+
+        async function loadMlModels() {
+            try {
+                const response = await fetch('/api/ml/models');
+                const data = await response.json();
+                const grid = document.getElementById('modelsList');
+                if (data.models.length === 0) {
+                    grid.innerHTML = '<p style="color: var(--text-muted);">No models registered yet</p>';
+                    return;
+                }
+                grid.innerHTML = data.models.map(model => `
+                    <div class="skill-card">
+                        <div class="skill-card-header">
+                            <div class="skill-icon">📦</div>
+                            <div class="skill-name">${model.name}</div>
+                        </div>
+                        <div class="skill-description">${model.framework} | ${model.architecture || 'Custom'}</div>
+                        <div style="margin-top: 8px; display: flex; gap: 8px;">
+                            <button class="btn btn-primary btn-sm" onclick="deployModel('${model.id}')">Deploy</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load models:', error);
+            }
+        }
+
+        async function registerModel() {
+            const config = {
+                name: document.getElementById('modelName').value,
+                framework: document.getElementById('modelFramework').value,
+                baseModel: document.getElementById('modelBaseModel').value
+            };
+            if (!config.name) { showToast('Enter model name', 'error'); return; }
+            
+            try {
+                await fetch('/api/ml/models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                showToast('Model registered!', 'success');
+                loadMlModels();
+            } catch (error) {
+                showToast('Failed to register model', 'error');
+            }
+        }
+
+        async function deployModel(modelId) {
+            try {
+                await fetch(`/api/ml/models/${modelId}/deploy`, { method: 'POST' });
+                showToast('Model deploying...', 'success');
+            } catch (error) {
+                showToast('Failed to deploy', 'error');
+            }
+        }
+
+        async function loadTrainingProviders() {
+            try {
+                const response = await fetch('/api/ml/providers');
+                const data = await response.json();
+                const grid = document.getElementById('trainingProvidersList');
+                grid.innerHTML = data.providers.map(provider => `
+                    <div class="skill-card">
+                        <div class="skill-card-header">
+                            <div class="skill-icon">☁️</div>
+                            <div class="skill-name">${provider.name}</div>
+                        </div>
+                        <div class="skill-description">${provider.description}</div>
+                        <div style="margin-top: 8px; font-size: 11px;">
+                            Models: ${provider.models.slice(0, 3).join(', ')}${provider.models.length > 3 ? '...' : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load providers:', error);
+            }
+        }
+
+        async function saveProviderKey() {
+            const provider = document.getElementById('providerSelect').value;
+            const key = document.getElementById('providerApiKey').value;
+            if (!key) { showToast('Enter API key', 'error'); return; }
+            
+            try {
+                await fetch('/api/training/api-key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider, key })
+                });
+                showToast(`${provider} API key saved!`, 'success');
+            } catch (error) {
+                showToast('Failed to save key', 'error');
+            }
+        }
+
+        async function loadCloudJobs() {
+            try {
+                const response = await fetch('/api/training/jobs');
+                const data = await response.json();
+                const div = document.getElementById('cloudJobsList');
+                if (data.jobs.length === 0) {
+                    div.innerHTML = '<p style="color: var(--text-muted); padding: 16px;">No cloud training jobs yet</p>';
+                    return;
+                }
+                div.innerHTML = data.jobs.map(job => `
+                    <div style="display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid var(--border);">
+                        <div>
+                            <div style="font-weight: 600;">${job.name}</div>
+                            <div style="font-size: 12px; color: var(--text-muted);">${job.provider} | ${job.model}</div>
+                        </div>
+                        <span style="color: ${job.status === 'running' ? 'var(--success)' : 'var(--text-muted)'};">${job.status}</span>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to load cloud jobs:', error);
+            }
+        }
+
+        function showCloudTrainingModal() {
+            showToast('Cloud training wizard - Coming soon!', 'info');
+        }
+
+        async function loadInfrastructure() {
+            try {
+                const [statusRes, catalogRes] = await Promise.all([
+                    fetch('/api/connections/status'),
+                    fetch('/api/catalog/all')
+                ]);
+                const status = await statusRes.json();
+                const catalog = await catalogRes.json();
+
+                const panel = document.getElementById('connectionStatusPanel');
+                panel.innerHTML = `
+                    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+                        ${(status.providers || []).map(p => `
+                            <div style="padding:10px;border:1px solid var(--border);border-radius:8px;">
+                                <div style="font-weight:600;">${p.id}</div>
+                                <div style="color:${p.connected ? 'var(--success)' : 'var(--text-muted)'};font-size:12px;">
+                                    ${p.connected ? 'Connected' : 'Not configured'}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+
+                document.getElementById('catalogSummary').innerHTML = `
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+                        <div class="metric-card"><div class="metric-value">${catalog.counts?.skills || 0}</div><div class="metric-label">Skills</div></div>
+                        <div class="metric-card"><div class="metric-value">${catalog.counts?.universalAdapters || 0}</div><div class="metric-label">Adapters</div></div>
+                        <div class="metric-card"><div class="metric-value">${catalog.counts?.mcpTools || 0}</div><div class="metric-label">MCP Tools</div></div>
+                        <div class="metric-card"><div class="metric-value">${catalog.counts?.lspServers || 0}</div><div class="metric-label">LSP Servers</div></div>
+                        <div class="metric-card"><div class="metric-value">${catalog.counts?.astParsers || 0}</div><div class="metric-label">AST Parsers</div></div>
+                        <div class="metric-card"><div class="metric-value">${(catalog.cloudTrainingProviders || []).length}</div><div class="metric-label">Cloud Trainers</div></div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('connectionStatusPanel').innerHTML = `<p style="color:var(--danger);">Failed to load infrastructure: ${error.message}</p>`;
+            }
+        }
+
+        async function loadAdaptersPage() {
+            try {
+                const response = await fetch('/api/universal-adapters');
+                const data = await response.json();
+                const grid = document.getElementById('adaptersGrid');
+                grid.innerHTML = (data.adapters || []).map(adapter => `
+                    <div class="skill-card">
+                        <div class="skill-card-header">
+                            <div class="skill-icon">${adapter.icon || '🔌'}</div>
+                            <div class="skill-name">${adapter.name}</div>
+                        </div>
+                        <div class="skill-description">${adapter.description || adapter.category}</div>
+                        <div style="margin-top:8px;font-size:11px;color:var(--text-muted);">${adapter.category || ''}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                document.getElementById('adaptersGrid').innerHTML = `<p style="color:var(--danger);">Failed to load adapters: ${error.message}</p>`;
+            }
+        }
+
+        // Page load handlers
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const page = item.dataset.page;
+                if (page === 'infrastructure') loadInfrastructure();
+                if (page === 'adapters') loadAdaptersPage();
+                if (page === 'lsp') refreshLspServers();
+                if (page === 'integrations') loadIntegrations();
+                if (page === 'openclaw') { loadOpenclawStatus(); loadOpenclawSkills(); }
+                if (page === 'wsl') refreshWslDistros();
+                if (page === 'users') { loadUsers(); loadRoles(); }
+                if (page === 'diagram-builder') setTimeout(initDiagramBuilder, 100);
+                if (page === 'ml-training') { loadTrainingTypes(); loadMlDatasets(); loadTrainingJobs(); }
+                if (page === 'ml-datasets') loadMlDatasets();
+                if (page === 'ml-experiments') loadExperiments();
+                if (page === 'ml-models') loadMlModels();
+                if (page === 'ai-training') { loadTrainingProviders(); loadCloudJobs(); }
+            });
+        });
+
+        refreshConnectionIndicator();
+
+        // Load diagram builder script
+        const diagramScript = document.createElement('script');
+        diagramScript.src = '/web/diagram-builder.js';
+        document.body.appendChild(diagramScript);
+    </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { createServer } from "node:http";
-import path from "node:path";
+import path, { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
@@ -11,7 +11,8 @@ import { SkillRegistry } from "./lib/skill-registry.mjs";
 import { McpRegistry } from "./lib/mcp-registry.mjs";
 import { SessionStore } from "./lib/session-store.mjs";
 import { runAutonomousTask } from "./lib/autonomous-runner.mjs";
-import { buildAuth } from "./lib/auth.mjs";
+import { buildUnifiedAuth } from "./lib/unified-auth.mjs";
+import { CapabilitiesManager } from "./lib/capabilities.mjs";
 import { checkToolPermission } from "./lib/tool-policy.mjs";
 import { Router } from "./lib/router.mjs";
 import { HookRegistry } from "./lib/hook-registry.mjs";
@@ -40,9 +41,9 @@ const app = express();
 app.use(express.json({ limit: "2mb" }));
 
 const config = await loadConfig();
-const auth = buildAuth(config);
+
 const models = new ModelRegistry(config.models ?? [], {
-  failoverOn: config.agent?.failoverOn
+  failoverOn: config.agent?.failoverOn,
 });
 const skills = new SkillRegistry(path.join(__dirname, "skills"), rootDir);
 await skills.load();
@@ -65,25 +66,6 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true, app: "openclaw-plus" });
 });
 
-app.use("/api", (req, res, next) => {
-  if (req.path.startsWith("/inbound/")) {
-    next();
-    return;
-  }
-  auth.middleware(req, res, next);
-});
-
-app.get("/api/me", (req, res) => {
-  res.json({
-    user: {
-      id: req.auth.userId,
-      name: req.auth.name,
-      role: req.auth.role,
-      policy: req.auth.policy
-    }
-  });
-});
-
 app.get("/api/models", (_req, res) => {
   res.json({ models: models.publicModels() });
 });
@@ -91,7 +73,7 @@ app.get("/api/models", (_req, res) => {
 app.get("/api/skills", (_req, res) => {
   res.json({
     skills: [...skills.publicSkills(), ...mcp.publicTools()],
-    warnings: mcp.loadErrors
+    warnings: mcp.loadErrors,
   });
 });
 
@@ -114,8 +96,8 @@ app.post("/api/skills/:skillId/invoke", async (req, res) => {
       approvalMode: req.auth?.policy?.approvalMode || "never",
       allowPatterns: req.auth?.policy?.allowPatterns || ["*"],
       denyPatterns: req.auth?.policy?.denyPatterns || [],
-      inputPolicies: config?.security?.toolInputPolicies || {}
-    }
+      inputPolicies: config?.security?.toolInputPolicies || {},
+    },
   });
 
   if (!policyResult.ok) {
@@ -127,7 +109,9 @@ app.post("/api/skills/:skillId/invoke", async (req, res) => {
     const result = await skill.run({ input, workspaceRoot: rootDir });
     res.json({ ok: true, skillId, result });
   } catch (error) {
-    res.status(500).json({ ok: false, skillId, error: String(error?.message || error) });
+    res
+      .status(500)
+      .json({ ok: false, skillId, error: String(error?.message || error) });
   }
 });
 
@@ -153,12 +137,12 @@ app.get("/api/experts/:domainId", (req, res) => {
 app.post("/api/sessions/:sessionId/expert", (req, res) => {
   const { sessionId } = req.params;
   const { domainId } = req.body;
-  
+
   if (!domainId) {
     res.status(400).json({ error: "domainId is required" });
     return;
   }
-  
+
   try {
     const expert = expertAdapter.setExpert(sessionId, domainId);
     res.json({ ok: true, expert });
@@ -178,7 +162,7 @@ app.post("/api/experts/detect", (req, res) => {
     res.status(400).json({ error: "query is required" });
     return;
   }
-  
+
   import("./lib/expert-router.mjs").then(({ expertRouter }) => {
     const domainId = expertRouter.detectDomain(query);
     const expert = expertRouter.getExpert(domainId);
@@ -199,7 +183,10 @@ app.get("/api/workflows/:industryId", (req, res) => {
 });
 
 app.get("/api/workflows/:industryId/:workflowId", (req, res) => {
-  const workflow = workflowEngine.getWorkflow(req.params.industryId, req.params.workflowId);
+  const workflow = workflowEngine.getWorkflow(
+    req.params.industryId,
+    req.params.workflowId,
+  );
   if (!workflow) {
     res.status(404).json({ error: "Workflow not found" });
     return;
@@ -208,7 +195,10 @@ app.get("/api/workflows/:industryId/:workflowId", (req, res) => {
 });
 
 app.post("/api/workflows/:industryId/:workflowId/execute", (req, res) => {
-  const workflow = workflowEngine.getWorkflow(req.params.industryId, req.params.workflowId);
+  const workflow = workflowEngine.getWorkflow(
+    req.params.industryId,
+    req.params.workflowId,
+  );
   if (!workflow) {
     res.status(404).json({ error: "Workflow not found" });
     return;
@@ -241,14 +231,18 @@ app.get("/api/wrappers/themes", (_req, res) => {
 
 app.post("/api/wrappers/generate", async (req, res) => {
   const { industryId, name, domain, pricing } = req.body;
-  
+
   if (!industryId) {
     res.status(400).json({ error: "industryId is required" });
     return;
   }
-  
+
   try {
-    const result = await wrapperGen.generateWrapper(industryId, { name, domain, pricing });
+    const result = await wrapperGen.generateWrapper(industryId, {
+      name,
+      domain,
+      pricing,
+    });
     res.json({ ok: true, ...result });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -267,21 +261,36 @@ app.get("/api/adapters/:industryId", (req, res) => {
 });
 
 app.get("/api/adapters/:industryId/:adapterId", (req, res) => {
-  const config = adapterRegistry.getAdapterConfig(req.params.industryId, req.params.adapterId);
+  const config = adapterRegistry.getAdapterConfig(
+    req.params.industryId,
+    req.params.adapterId,
+  );
   if (!config) {
     res.status(404).json({ error: "Adapter not found" });
     return;
   }
-  const envCheck = adapterRegistry.checkEnvConfigured(req.params.industryId, req.params.adapterId);
-  res.json({ adapter: config, envConfigured: envCheck.configured, missingEnv: envCheck.missing });
+  const envCheck = adapterRegistry.checkEnvConfigured(
+    req.params.industryId,
+    req.params.adapterId,
+  );
+  res.json({
+    adapter: config,
+    envConfigured: envCheck.configured,
+    missingEnv: envCheck.missing,
+  });
 });
 
 app.post("/api/adapters/:industryId/:adapterId/:endpoint", async (req, res) => {
   const { industryId, adapterId, endpoint } = req.params;
   const params = req.body || {};
-  
+
   try {
-    const result = await adapterRegistry.callAdapter(industryId, adapterId, endpoint, params);
+    const result = await adapterRegistry.callAdapter(
+      industryId,
+      adapterId,
+      endpoint,
+      params,
+    );
     res.json({ ok: true, result });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -333,9 +342,958 @@ app.post("/api/terraform/destroy", async (req, res) => {
 });
 
 import { getAllAdapters, listAllAdapters } from "./lib/universal-adapters.mjs";
+import { OpenClawBridge } from "./lib/openclaw-bridge.mjs";
+
+const openclaw = new OpenClawBridge();
 
 app.get("/api/universal-adapters", (_req, res) => {
   res.json({ adapters: listAllAdapters() });
+});
+
+app.get("/api/openclaw/status", async (_req, res) => {
+  try {
+    const status = openclaw.getStatus();
+    const install = await openclaw.checkInstallation();
+    res.json({ ...status, installation: install });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/openclaw/skills", async (_req, res) => {
+  try {
+    const skills = await openclaw.listSkills();
+    res.json({ skills });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/openclaw/channels", async (_req, res) => {
+  try {
+    const result = await openclaw.listChannels();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/openclaw/channels/login", async (req, res) => {
+  try {
+    const { channel } = req.body;
+    const result = await openclaw.loginChannel(channel);
+    res.json({ ok: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/openclaw/channels/logout", async (req, res) => {
+  try {
+    const { channel } = req.body;
+    const result = await openclaw.logoutChannel(channel);
+    res.json({ ok: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/openclaw/models", async (_req, res) => {
+  try {
+    const result = await openclaw.getModels();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/openclaw/models/set", async (req, res) => {
+  try {
+    const { model } = req.body;
+    const result = await openclaw.setModel(model);
+    res.json({ ok: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/openclaw/gateway/start", async (req, res) => {
+  try {
+    const { port, force } = req.body || {};
+    const result = await openclaw.startGateway({ port, force });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/openclaw/gateway/stop", async (_req, res) => {
+  try {
+    const result = await openclaw.stopGateway();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/openclaw/message/send", async (req, res) => {
+  try {
+    const { target, message, channel, deliver } = req.body;
+    const result = await openclaw.sendMessage({
+      target,
+      message,
+      channel,
+      deliver,
+    });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/openclaw/agent/chat", async (req, res) => {
+  try {
+    const { message, target, deliver } = req.body;
+    const result = await openclaw.agentChat(message, { target, deliver });
+    res.json({ ok: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/openclaw/agent/start", async (req, res) => {
+  try {
+    const { target, mode } = req.body || {};
+    const result = await openclaw.startAgent({ target, mode });
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/openclaw/agent/stop", async (_req, res) => {
+  try {
+    const result = await openclaw.stopAgent();
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/openclaw/doctor", async (_req, res) => {
+  try {
+    const result = await openclaw.runDoctor();
+    res.json({ ok: true, result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+import { UserManager } from "./lib/user-manager.mjs";
+import { IntegrationManager } from "./lib/integration-manager.mjs";
+
+const userManager = new UserManager(join(rootDir, "data"));
+const integrationManager = new IntegrationManager(join(rootDir, "data"));
+
+await userManager.initialize();
+await integrationManager.initialize();
+
+// Initialize unified auth with userManager support
+const auth = buildUnifiedAuth(config, userManager);
+
+// Initialize capabilities manager
+const capabilitiesManager = new CapabilitiesManager(config, {
+  models,
+  skills,
+  mcp,
+  userManager,
+  integrationManager,
+  rootDir,
+});
+
+// Apply unified auth middleware
+app.use("/api", (req, res, next) => {
+  if (req.path.startsWith("/inbound/") || req.path.startsWith("/auth/")) {
+    next();
+    return;
+  }
+  auth.middleware(req, res, next);
+});
+
+// User endpoint (requires auth)
+app.get("/api/me", (req, res) => {
+  res.json({
+    user: {
+      id: req.auth.userId,
+      name: req.auth.name,
+      role: req.auth.role,
+      policy: req.auth.policy,
+    },
+  });
+});
+
+// Capabilities and Doctor endpoints
+app.get("/api/capabilities", async (_req, res) => {
+  try {
+    const capabilities = await capabilitiesManager.getCapabilities();
+    res.json({ ok: true, capabilities });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/doctor", async (_req, res) => {
+  try {
+    const doctor = await capabilitiesManager.runDoctor();
+    res.json({ ok: true, doctor });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/health/detailed", async (_req, res) => {
+  try {
+    const health = await capabilitiesManager.quickHealthCheck();
+    res.json({ ok: true, health });
+  } catch (error) {
+    res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+app.get("/api/users", (req, res) => {
+  res.json({ users: userManager.listUsers() });
+});
+
+app.get("/api/users/:email", (req, res) => {
+  const user = userManager.getUser(req.params.email);
+  if (!user) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  res.json({ user });
+});
+
+app.post("/api/users", async (req, res) => {
+  try {
+    const user = await userManager.createUser(req.body);
+    res.json({ ok: true, user });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.patch("/api/users/:email", async (req, res) => {
+  try {
+    const user = await userManager.updateUser(req.params.email, req.body);
+    res.json({ ok: true, user });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete("/api/users/:email", async (req, res) => {
+  try {
+    await userManager.deleteUser(req.params.email);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const result = await userManager.authenticate(email, password);
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(401).json(result);
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/auth/logout", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (token) {
+      await userManager.logout(token);
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/auth/me", async (req, res) => {
+  try {
+    const token = req.headers.authorization?.replace("Bearer ", "");
+    if (!token) {
+      res.status(401).json({ error: "No token provided" });
+      return;
+    }
+    const result = await userManager.validateSession(token);
+    if (result.valid) {
+      res.json({ user: result.user });
+    } else {
+      res.status(401).json(result);
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/roles", (_req, res) => {
+  res.json({ roles: userManager.listRoles() });
+});
+
+app.get("/api/users/:email/api-keys", async (req, res) => {
+  try {
+    const keys = await userManager.listApiKeys(req.params.email);
+    res.json({ apiKeys: keys });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/users/:email/api-keys", async (req, res) => {
+  try {
+    const apiKey = await userManager.createApiKey(req.params.email, req.body);
+    res.json({ ok: true, apiKey });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete("/api/users/:email/api-keys/:keyId", async (req, res) => {
+  try {
+    await userManager.revokeApiKey(req.params.email, req.params.keyId);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/integrations/types", (_req, res) => {
+  res.json({ types: integrationManager.listIntegrationTypes() });
+});
+
+app.get("/api/integrations", (req, res) => {
+  const userId = req.query.userId;
+  res.json({ integrations: integrationManager.listIntegrations(userId) });
+});
+
+app.post("/api/integrations", async (req, res) => {
+  try {
+    const { userId, type, config } = req.body;
+    const integration = await integrationManager.configureIntegration(
+      userId,
+      type,
+      config,
+    );
+    res.json({ ok: true, integration });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/integrations/:id", (req, res) => {
+  const integration = integrationManager.getIntegration(req.params.id);
+  if (!integration) {
+    res.status(404).json({ error: "Integration not found" });
+    return;
+  }
+  res.json({ integration });
+});
+
+app.patch("/api/integrations/:id", async (req, res) => {
+  try {
+    const integration = await integrationManager.updateIntegration(
+      req.params.id,
+      req.body,
+    );
+    res.json({ ok: true, integration });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete("/api/integrations/:id", async (req, res) => {
+  try {
+    await integrationManager.deleteIntegration(req.params.id);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/integrations/:id/test", async (req, res) => {
+  try {
+    const result = await integrationManager.testIntegration(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/integrations/:id/execute", async (req, res) => {
+  try {
+    const { action, params } = req.body;
+    const result = await integrationManager.executeAction(
+      req.params.id,
+      action,
+      params,
+    );
+    res.json({ ok: true, result });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/integrations/:id/webhooks", (req, res) => {
+  const webhooks = integrationManager.listWebhooks(req.params.id);
+  res.json({ webhooks });
+});
+
+app.post("/api/integrations/:id/webhooks", async (req, res) => {
+  try {
+    const { events, url } = req.body;
+    const webhook = await integrationManager.createWebhook(
+      req.params.id,
+      events,
+      url,
+    );
+    res.json({ ok: true, webhook });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete("/api/webhooks/:id", async (req, res) => {
+  try {
+    await integrationManager.deleteWebhook(req.params.id);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+import { LSPManager, LANGUAGE_SERVERS } from "./lib/lsp-manager.mjs";
+import { ASTManager, PARSERS } from "./lib/ast-manager.mjs";
+import { getConnectionStatus } from "./lib/connection-status.mjs";
+
+const lspManager = new LSPManager();
+const astManager = new ASTManager();
+
+app.get("/api/catalog/all", async (_req, res) => {
+  try {
+    const connectionStatus = await getConnectionStatus();
+    res.json({
+      app: "openclaw-plus",
+      counts: {
+        skills: skills.publicSkills().length,
+        mcpTools: mcp.publicTools().length,
+        universalAdapters: listAllAdapters().length,
+        industryAdapters: adapterRegistry.listIndustries().length,
+        lspServers: lspManager.listServers().length,
+        astParsers: astManager.listParsers().length
+      },
+      skills: skills.publicSkills(),
+      mcpTools: mcp.publicTools(),
+      universalAdapters: listAllAdapters(),
+      industryAdapters: adapterRegistry.listIndustries(),
+      lspServers: lspManager.listServers(),
+      astParsers: astManager.listParsers(),
+      trainingTypes: mlPlatform.getTrainingTypes(),
+      neuralNetworks: mlPlatform.getNeuralNetworkTypes(),
+      environments: mlPlatform.getEnvironments(),
+      cloudTrainingProviders: aiTraining.getProviders(),
+      trainingMethods: aiTraining.getMethods(),
+      connections: connectionStatus
+    });
+  } catch (error) {
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+app.get("/api/connections/status", async (_req, res) => {
+  try {
+    const status = await getConnectionStatus();
+    res.json(status);
+  } catch (error) {
+    res.status(500).json({ error: String(error?.message || error) });
+  }
+});
+
+// Handle LSP errors gracefully - language servers might not be installed
+lspManager.on("error", ({ serverId, error }) => {
+  console.error(
+    `[LSPManager] Language server error (${serverId}):`,
+    error.message,
+  );
+  // Don't crash the server - just log the error
+});
+
+lspManager.on("stderr", ({ serverId, data }) => {
+  console.error(`[LSPManager] Language server stderr (${serverId}):`, data);
+});
+
+app.get("/api/lsp/servers", (_req, res) => {
+  res.json({
+    servers: lspManager.listServers(),
+    running: lspManager.getRunningServers(),
+  });
+});
+
+app.post("/api/lsp/start", async (req, res) => {
+  try {
+    const { serverId, projectRoot } = req.body;
+    const client = await lspManager.startServer(
+      serverId,
+      projectRoot || process.cwd(),
+    );
+    res.json({ ok: true, serverId, capabilities: client.capabilities });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/lsp/stop", async (req, res) => {
+  try {
+    const { serverId } = req.body;
+    await lspManager.stopServer(serverId);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/lsp/document/open", async (req, res) => {
+  try {
+    const { serverId, uri, languageId, content } = req.body;
+    const doc = await lspManager.openDocument(
+      serverId,
+      uri,
+      languageId,
+      content,
+    );
+    res.json({
+      ok: true,
+      document: { uri: doc.uri, languageId: doc.languageId },
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/lsp/document/update", async (req, res) => {
+  try {
+    const { uri, content } = req.body;
+    await lspManager.updateDocument(uri, content);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/lsp/document/close", async (req, res) => {
+  try {
+    const { uri } = req.body;
+    await lspManager.closeDocument(uri);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/lsp/diagnostics", (req, res) => {
+  const uri = req.query.uri;
+  if (uri) {
+    res.json({ diagnostics: lspManager.getDiagnostics(uri) });
+  } else {
+    res.json({ diagnostics: lspManager.getAllDiagnostics() });
+  }
+});
+
+app.post("/api/lsp/completion", async (req, res) => {
+  try {
+    const { uri, position } = req.body;
+    const items = await lspManager.getCompletion(uri, position);
+    res.json({ items });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/lsp/hover", async (req, res) => {
+  try {
+    const { uri, position } = req.body;
+    const result = await lspManager.getHover(uri, position);
+    res.json({ hover: result });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/lsp/definition", async (req, res) => {
+  try {
+    const { uri, position } = req.body;
+    const locations = await lspManager.getDefinition(uri, position);
+    res.json({ locations });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/lsp/references", async (req, res) => {
+  try {
+    const { uri, position } = req.body;
+    const references = await lspManager.getReferences(uri, position);
+    res.json({ references });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/lsp/symbols/document", async (req, res) => {
+  try {
+    const { uri } = req.body;
+    const symbols = await lspManager.getDocumentSymbols(uri);
+    res.json({ symbols });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/lsp/symbols/workspace", async (req, res) => {
+  try {
+    const { query } = req.body;
+    const symbols = await lspManager.getWorkspaceSymbols(query || "");
+    res.json({ symbols });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/ast/parsers", (_req, res) => {
+  res.json({ parsers: astManager.listParsers() });
+});
+
+app.post("/api/ast/parse", async (req, res) => {
+  try {
+    const { filePath, content } = req.body;
+    const result = await astManager.parseFile(filePath, content);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ast/symbols", async (req, res) => {
+  try {
+    const { filePath, content } = req.body;
+    const symbols = await astManager.extractSymbols(filePath, content);
+    res.json({ symbols });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ast/structure", async (req, res) => {
+  try {
+    const { filePath, content } = req.body;
+    const structure = await astManager.getStructure(filePath, content);
+    res.json(structure);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ast/references", async (req, res) => {
+  try {
+    const { filePath, symbolName, content } = req.body;
+    const references = await astManager.findReferences(
+      filePath,
+      symbolName,
+      content,
+    );
+    res.json({ references });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ast/dependencies", async (req, res) => {
+  try {
+    const { filePath, content } = req.body;
+    const deps = await astManager.analyzeDependencies(filePath, content);
+    res.json(deps);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+import {
+  MLPlatform,
+  TRAINING_TYPES,
+  NEURAL_NETWORK_TYPES,
+  DEVELOPER_ENVIRONMENTS,
+} from "./lib/ml-platform.mjs";
+import {
+  AITrainingManager,
+  TRAINING_PROVIDERS,
+  TRAINING_METHODS,
+} from "./lib/ai-training.mjs";
+
+const mlPlatform = new MLPlatform(join(rootDir, "data", "ml"));
+await mlPlatform.initialize();
+const aiTraining = new AITrainingManager();
+
+app.get("/api/ml/training-types", (_req, res) => {
+  res.json({ types: mlPlatform.getTrainingTypes() });
+});
+
+app.get("/api/ml/network-types", (_req, res) => {
+  res.json({ types: mlPlatform.getNeuralNetworkTypes() });
+});
+
+app.get("/api/ml/environments", (_req, res) => {
+  res.json({ environments: mlPlatform.getEnvironments() });
+});
+
+app.get("/api/ml/providers", (_req, res) => {
+  res.json({ providers: aiTraining.getProviders() });
+});
+
+app.get("/api/ml/methods", (_req, res) => {
+  res.json({ methods: aiTraining.getMethods() });
+});
+
+app.post("/api/ml/datasets", async (req, res) => {
+  try {
+    const dataset = await mlPlatform.createDataset(req.body);
+    res.json({ ok: true, dataset });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/ml/datasets", (req, res) => {
+  const type = req.query.type;
+  res.json({ datasets: mlPlatform.listDatasets(type) });
+});
+
+app.post("/api/ml/datasets/:id/split", async (req, res) => {
+  try {
+    const dataset = await mlPlatform.splitDataset(req.params.id, req.body);
+    res.json({ ok: true, dataset });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ml/jobs", async (req, res) => {
+  try {
+    const job = await mlPlatform.createTrainingJob(req.body);
+    res.json({ ok: true, job });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/ml/jobs", (req, res) => {
+  const status = req.query.status;
+  res.json({ jobs: mlPlatform.listJobs(status) });
+});
+
+app.get("/api/ml/jobs/:id", (req, res) => {
+  const job = mlPlatform.getJob(req.params.id);
+  if (!job) {
+    res.status(404).json({ error: "Job not found" });
+    return;
+  }
+  res.json({ job });
+});
+
+app.post("/api/ml/jobs/:id/start", async (req, res) => {
+  try {
+    const job = await mlPlatform.startTraining(req.params.id);
+    res.json({ ok: true, job });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ml/jobs/:id/cancel", async (req, res) => {
+  try {
+    const job = await mlPlatform.cancelJob(req.params.id);
+    res.json({ ok: true, job });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ml/jobs/:id/progress", async (req, res) => {
+  try {
+    const { progress, metrics } = req.body;
+    const job = await mlPlatform.updateJobProgress(
+      req.params.id,
+      progress,
+      metrics,
+    );
+    res.json({ ok: true, job });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ml/jobs/:id/checkpoint", async (req, res) => {
+  try {
+    const checkpoint = await mlPlatform.createCheckpoint(
+      req.params.id,
+      req.body,
+    );
+    res.json({ ok: true, checkpoint });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ml/experiments", async (req, res) => {
+  try {
+    const experiment = await mlPlatform.createExperiment(req.body);
+    res.json({ ok: true, experiment });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/ml/experiments", (_req, res) => {
+  res.json({ experiments: mlPlatform.listExperiments() });
+});
+
+app.post("/api/ml/experiments/:id/jobs", async (req, res) => {
+  try {
+    const { jobId } = req.body;
+    const experiment = await mlPlatform.addJobToExperiment(
+      req.params.id,
+      jobId,
+    );
+    res.json({ ok: true, experiment });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ml/models", async (req, res) => {
+  try {
+    const model = await mlPlatform.registerModel(req.body);
+    res.json({ ok: true, model });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/ml/models", (_req, res) => {
+  res.json({ models: mlPlatform.listModels() });
+});
+
+app.post("/api/ml/models/:id/deploy", async (req, res) => {
+  try {
+    const deployment = await mlPlatform.deployModel(req.params.id, req.body);
+    res.json({ ok: true, deployment });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ml/checkpoints/:id/restore", async (req, res) => {
+  try {
+    const result = await mlPlatform.restoreCheckpoint(req.params.id);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/ml/recommendations", (req, res) => {
+  const recommendations = mlPlatform.getRecommendations(req.body);
+  res.json({ recommendations });
+});
+
+app.post("/api/ml/estimate", (req, res) => {
+  const estimate = mlPlatform.estimateResources(req.body);
+  res.json(estimate);
+});
+
+app.post("/api/training/api-key", (req, res) => {
+  const { provider, key } = req.body;
+  aiTraining.setApiKey(provider, key);
+  res.json({ ok: true });
+});
+
+app.post("/api/training/jobs", async (req, res) => {
+  try {
+    const job = await aiTraining.createTrainingJob(req.body);
+    res.json({ ok: true, job });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/training/jobs", (req, res) => {
+  const status = req.query.status;
+  res.json({ jobs: aiTraining.listJobs(status) });
+});
+
+app.post("/api/training/jobs/:id/start", async (req, res) => {
+  try {
+    const job = await aiTraining.startTraining(req.params.id);
+    res.json({ ok: true, job });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/training/jobs/:id/status", async (req, res) => {
+  try {
+    const job = await aiTraining.getJobStatus(req.params.id);
+    res.json({ job });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/training/jobs/:id/cancel", async (req, res) => {
+  try {
+    const job = await aiTraining.cancelJob(req.params.id);
+    res.json({ ok: true, job });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.post("/api/training/datasets", async (req, res) => {
+  try {
+    const dataset = await aiTraining.createDataset(req.body);
+    res.json({ ok: true, dataset });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/training/datasets", (_req, res) => {
+  res.json({ datasets: aiTraining.listDatasets() });
+});
+
+app.get("/api/training/models", (_req, res) => {
+  res.json({ models: aiTraining.listModels() });
+});
+
+app.post("/api/training/estimate", (req, res) => {
+  const estimate = aiTraining.estimateCost(req.body);
+  res.json(estimate);
 });
 
 app.get("/api/universal-adapters/:category", (req, res) => {
@@ -348,8 +1306,17 @@ app.get("/api/universal-adapters/:category", (req, res) => {
 });
 
 import { telemetry, wrapModelCall } from "./lib/ai-telemetry.mjs";
-import { guardrails, GUARDRAILS, applyAwsGuardrails } from "./lib/guardrails.mjs";
-import { SERVICE_PROVISIONING, AI_SERVICES, AI_SDKS, listServiceCategories } from "./lib/service-provisioning.mjs";
+import {
+  guardrails,
+  GUARDRAILS,
+  applyAwsGuardrails,
+} from "./lib/guardrails.mjs";
+import {
+  SERVICE_PROVISIONING,
+  AI_SERVICES,
+  AI_SDKS,
+  listServiceCategories,
+} from "./lib/service-provisioning.mjs";
 
 app.get("/api/telemetry/metrics", (_req, res) => {
   res.json({ metrics: telemetry.getMetrics() });
@@ -360,7 +1327,7 @@ app.get("/api/telemetry/traces", (req, res) => {
     name: req.query.name,
     status: req.query.status,
     startTime: req.query.startTime ? parseInt(req.query.startTime) : undefined,
-    endTime: req.query.endTime ? parseInt(req.query.endTime) : undefined
+    endTime: req.query.endTime ? parseInt(req.query.endTime) : undefined,
   });
   res.json({ traces });
 });
@@ -378,7 +1345,7 @@ app.get("/api/telemetry/generations", (req, res) => {
   const generations = telemetry.searchGenerations({
     model: req.query.model,
     provider: req.query.provider,
-    status: req.query.status
+    status: req.query.status,
   });
   res.json({ generations });
 });
@@ -437,7 +1404,9 @@ app.get("/api/services", (_req, res) => {
 });
 
 app.get("/api/services/:category", (req, res) => {
-  const services = SERVICE_PROVISIONING[req.params.category] || AI_SERVICES[req.params.category];
+  const services =
+    SERVICE_PROVISIONING[req.params.category] ||
+    AI_SERVICES[req.params.category];
   if (!services) {
     res.status(404).json({ error: "Service category not found" });
     return;
@@ -537,7 +1506,11 @@ app.post("/api/setup/save-env", async (req, res) => {
 
 app.post("/api/setup/quick-setup", async (req, res) => {
   try {
-    const result = await setupWizard.quickSetup(req.body.provider, req.body.apiKey, req.body.options);
+    const result = await setupWizard.quickSetup(
+      req.body.provider,
+      req.body.apiKey,
+      req.body.options,
+    );
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -555,7 +1528,10 @@ app.get("/api/setup/detect-local", async (_req, res) => {
 
 app.post("/api/setup/test-connection", async (req, res) => {
   try {
-    const result = await setupWizard.testConnection(req.body.type, req.body.config);
+    const result = await setupWizard.testConnection(
+      req.body.type,
+      req.body.config,
+    );
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -595,7 +1571,10 @@ app.delete("/api/architecture/plans/:planId", (req, res) => {
 
 app.post("/api/architecture/plans/:planId/components", (req, res) => {
   try {
-    const component = architecturePlanner.addComponent(req.params.planId, req.body);
+    const component = architecturePlanner.addComponent(
+      req.params.planId,
+      req.body,
+    );
     res.json({ ok: true, component });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -604,7 +1583,10 @@ app.post("/api/architecture/plans/:planId/components", (req, res) => {
 
 app.post("/api/architecture/plans/:planId/connections", (req, res) => {
   try {
-    const connection = architecturePlanner.addConnection(req.params.planId, req.body);
+    const connection = architecturePlanner.addConnection(
+      req.params.planId,
+      req.body,
+    );
     res.json({ ok: true, connection });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -613,7 +1595,10 @@ app.post("/api/architecture/plans/:planId/connections", (req, res) => {
 
 app.get("/api/architecture/plans/:planId/diagram", (req, res) => {
   try {
-    const diagram = architecturePlanner.generateMermaidDiagram(req.params.planId, { type: req.query.type });
+    const diagram = architecturePlanner.generateMermaidDiagram(
+      req.params.planId,
+      { type: req.query.type },
+    );
     res.json({ ok: true, ...diagram });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -623,7 +1608,10 @@ app.get("/api/architecture/plans/:planId/diagram", (req, res) => {
 app.get("/api/architecture/plans/:planId/infrastructure", (req, res) => {
   try {
     const format = req.query.format || "terraform";
-    const code = architecturePlanner.generateInfrastructureCode(req.params.planId, format);
+    const code = architecturePlanner.generateInfrastructureCode(
+      req.params.planId,
+      format,
+    );
     res.type("text/plain").send(code);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -688,14 +1676,19 @@ app.get("/api/drift/reports/:reportId", (req, res) => {
 
 app.post("/rpc", async (req, res) => {
   const { jsonrpc, method, params, id } = req.body;
-  
+
   if (jsonrpc !== "2.0") {
-    res.json({ jsonrpc: "2.0", error: { code: -32600, message: "Invalid Request" }, id: null });
+    res.json({
+      jsonrpc: "2.0",
+      error: { code: -32600, message: "Invalid Request" },
+      id: null,
+    });
     return;
   }
 
   const success = (result) => res.json({ jsonrpc: "2.0", result, id });
-  const error = (code, message, data) => res.json({ jsonrpc: "2.0", error: { code, message, data }, id });
+  const error = (code, message, data) =>
+    res.json({ jsonrpc: "2.0", error: { code, message, data }, id });
 
   try {
     switch (method) {
@@ -717,10 +1710,10 @@ app.post("/rpc", async (req, res) => {
           error(-32602, "skillId is required");
           return;
         }
-        
+
         const allSkills = [...skills.toolsFor(), ...mcp.toolsFor()];
-        const skill = allSkills.find(s => s.id === skillId);
-        
+        const skill = allSkills.find((s) => s.id === skillId);
+
         if (!skill) {
           error(-32602, `Skill not found: ${skillId}`);
           return;
@@ -733,8 +1726,8 @@ app.post("/rpc", async (req, res) => {
             approvalMode: req.auth?.policy?.approvalMode || "never",
             allowPatterns: req.auth?.policy?.allowPatterns || ["*"],
             denyPatterns: req.auth?.policy?.denyPatterns || [],
-            inputPolicies: config?.security?.toolInputPolicies || {}
-          }
+            inputPolicies: config?.security?.toolInputPolicies || {},
+          },
         });
 
         if (!policyResult.ok) {
@@ -752,7 +1745,9 @@ app.post("/rpc", async (req, res) => {
       }
 
       case "sessions.list":
-        success(store.listSessions({ userId: req.auth?.userId || "anonymous" }));
+        success(
+          store.listSessions({ userId: req.auth?.userId || "anonymous" }),
+        );
         break;
 
       case "sessions.create": {
@@ -761,7 +1756,7 @@ app.post("/rpc", async (req, res) => {
           userId: req.auth?.userId || "anonymous",
           title,
           settings,
-          agentId
+          agentId,
         });
         await store.flush();
         success(session);
@@ -772,15 +1767,16 @@ app.post("/rpc", async (req, res) => {
         const { sessionId } = params || {};
         const session = store.getSession({
           userId: req.auth?.userId || "anonymous",
-          sessionId
+          sessionId,
         });
         success(session || null);
         break;
       }
 
       case "run": {
-        const { modelId, objective, sessionId, enabledSkillIds, settings } = params || {};
-        
+        const { modelId, objective, sessionId, enabledSkillIds, settings } =
+          params || {};
+
         if (!modelId || !objective) {
           error(-32602, "modelId and objective are required");
           return;
@@ -793,11 +1789,14 @@ app.post("/rpc", async (req, res) => {
         }
 
         const session = sessionId
-          ? store.getSession({ userId: req.auth?.userId || "anonymous", sessionId })
+          ? store.getSession({
+              userId: req.auth?.userId || "anonymous",
+              sessionId,
+            })
           : store.createSession({
               userId: req.auth?.userId || "anonymous",
               title: objective.slice(0, 60),
-              settings: settings || {}
+              settings: settings || {},
             });
 
         const result = await runAutonomousTask({
@@ -805,13 +1804,16 @@ app.post("/rpc", async (req, res) => {
             model,
             session,
             route: null,
-            userPolicy: req.auth?.policy || { approvalMode: "never", allowPatterns: ["*"] },
+            userPolicy: req.auth?.policy || {
+              approvalMode: "never",
+              allowPatterns: ["*"],
+            },
             objective,
             enabledSkillIds,
-            settings: { ...session.settings, ...settings }
+            settings: { ...session.settings, ...settings },
           },
           onEvent() {},
-          context: { rootDir, automation: config?.automation }
+          context: { rootDir, automation: config?.automation },
         });
 
         await store.flush();
@@ -839,7 +1841,7 @@ app.post("/api/sessions", async (req, res) => {
     settings,
     agentId,
     routeKey,
-    source
+    source,
   });
   await hooks.emit({
     type: "session_created",
@@ -848,9 +1850,9 @@ app.post("/api/sessions", async (req, res) => {
     routeKey: created.routeKey,
     details: {
       title: created.title,
-      agentId: created.agentId
+      agentId: created.agentId,
     },
-    context: { rootDir, automation: config?.automation }
+    context: { rootDir, automation: config?.automation },
   });
   await store.flush();
   res.status(201).json({ session: created });
@@ -859,7 +1861,7 @@ app.post("/api/sessions", async (req, res) => {
 app.get("/api/sessions/:sessionId", (req, res) => {
   const session = store.getSession({
     userId: req.auth.userId,
-    sessionId: req.params.sessionId
+    sessionId: req.params.sessionId,
   });
 
   if (!session) {
@@ -871,7 +1873,8 @@ app.get("/api/sessions/:sessionId", (req, res) => {
 });
 
 function parseRunRequest(req, res) {
-  const { modelId, objective, enabledSkillIds, sessionId, settings, source } = req.body ?? {};
+  const { modelId, objective, enabledSkillIds, sessionId, settings, source } =
+    req.body ?? {};
   if (!modelId || !objective) {
     res.status(400).json({ error: "modelId and objective are required" });
     return null;
@@ -900,7 +1903,7 @@ function parseRunRequest(req, res) {
       routeKey: route.routeKey,
       source: route.source,
       title: `${route.agentName} :: ${route.routeKey}`,
-      settings
+      settings,
     });
   }
 
@@ -913,15 +1916,15 @@ function parseRunRequest(req, res) {
     enabledSkillIds,
     settings: {
       ...session.settings,
-      ...(settings || {})
-    }
+      ...(settings || {}),
+    },
   };
 }
 
 async function runAndPersist({ requestData, onEvent }) {
   const availableTools = [
     ...skills.toolsFor(requestData.enabledSkillIds),
-    ...mcp.toolsFor(requestData.enabledSkillIds)
+    ...mcp.toolsFor(requestData.enabledSkillIds),
   ];
 
   const requestedPolicy = requestData.settings.toolPolicy || {};
@@ -932,17 +1935,17 @@ async function runAndPersist({ requestData, onEvent }) {
       requestedPolicy.approvalMode ||
       requestData.userPolicy?.approvalMode ||
       "never",
-    allowPatterns:
-      requestedPolicy.allowPatterns || requestData.userPolicy?.allowPatterns || ["*"],
+    allowPatterns: requestedPolicy.allowPatterns ||
+      requestData.userPolicy?.allowPatterns || ["*"],
     denyPatterns: [
       ...(requestData.userPolicy?.denyPatterns || []),
-      ...(requestedPolicy.denyPatterns || [])
+      ...(requestedPolicy.denyPatterns || []),
     ],
     inputPolicies: {
       ...(globalInputPolicies || {}),
       ...(requestData.userPolicy?.inputPolicies || {}),
-      ...(requestedPolicy.inputPolicies || {})
-    }
+      ...(requestedPolicy.inputPolicies || {}),
+    },
   };
 
   await hooks.emit({
@@ -952,9 +1955,9 @@ async function runAndPersist({ requestData, onEvent }) {
     routeKey: requestData.session.routeKey,
     details: {
       objective: requestData.objective,
-      modelId: requestData.model.id
+      modelId: requestData.model.id,
     },
-    context: { rootDir, automation: config?.automation }
+    context: { rootDir, automation: config?.automation },
   });
 
   const emitEvent = async (event) => {
@@ -969,7 +1972,7 @@ async function runAndPersist({ requestData, onEvent }) {
         sessionId: requestData.session.id,
         routeKey: requestData.session.routeKey,
         details: event,
-        context: { rootDir, automation: config?.automation }
+        context: { rootDir, automation: config?.automation },
       });
     }
   };
@@ -979,42 +1982,47 @@ async function runAndPersist({ requestData, onEvent }) {
     tools: availableTools,
     objective: requestData.objective,
     session: requestData.session,
-    maxSteps: Number(requestData.settings.maxSteps ?? config.agent?.maxSteps ?? 8),
+    maxSteps: Number(
+      requestData.settings.maxSteps ?? config.agent?.maxSteps ?? 8,
+    ),
     maxCycles:
       requestData.settings.autonomyMode === "single-cycle"
         ? 1
-        : Number(requestData.settings.maxCycles ?? config.agent?.maxCycles ?? 4),
-      canRunTool(toolId, input) {
-        return checkToolPermission({
-          toolId,
-          input,
-          policy: {
-            approvalMode: requestData.settings.approvalMode || policy.approvalMode || "never",
-            allowPatterns: policy.allowPatterns || ["*"],
-            denyPatterns: policy.denyPatterns || [],
-            inputPolicies: policy.inputPolicies || {}
-          }
-        });
-      },
-    onEvent: emitEvent
+        : Number(
+            requestData.settings.maxCycles ?? config.agent?.maxCycles ?? 4,
+          ),
+    canRunTool(toolId, input) {
+      return checkToolPermission({
+        toolId,
+        input,
+        policy: {
+          approvalMode:
+            requestData.settings.approvalMode || policy.approvalMode || "never",
+          allowPatterns: policy.allowPatterns || ["*"],
+          denyPatterns: policy.denyPatterns || [],
+          inputPolicies: policy.inputPolicies || {},
+        },
+      });
+    },
+    onEvent: emitEvent,
   });
 
   const session = store.appendMessages({
     userId: requestData.session.userId,
     sessionId: requestData.session.id,
-    messages: result.messagesToPersist
+    messages: result.messagesToPersist,
   });
 
   session.settings = {
     ...session.settings,
-    ...requestData.settings
+    ...requestData.settings,
   };
 
   store.updateAfterRun({
     userId: requestData.session.userId,
     sessionId: requestData.session.id,
     trace: result.trace,
-    memory: result.memory
+    memory: result.memory,
   });
   await store.flush();
 
@@ -1025,14 +2033,14 @@ async function runAndPersist({ requestData, onEvent }) {
     routeKey: requestData.session.routeKey,
     details: {
       done: result.done,
-      cycles: result.cycles
+      cycles: result.cycles,
     },
-    context: { rootDir, automation: config?.automation }
+    context: { rootDir, automation: config?.automation },
   });
 
   return {
     ...result,
-    session
+    session,
   };
 }
 
@@ -1044,9 +2052,10 @@ async function executeInbound({
   enabledSkillIds,
   settings,
   metadata,
-  modelId
+  modelId,
 }) {
-  const selectedModelId = modelId || config?.channels?.[channel]?.modelId || config.models?.[0]?.id;
+  const selectedModelId =
+    modelId || config?.channels?.[channel]?.modelId || config.models?.[0]?.id;
   const model = models.get(selectedModelId);
   if (!model) {
     throw new Error(`Unknown model: ${selectedModelId}`);
@@ -1055,7 +2064,7 @@ async function executeInbound({
   const route = router.resolve({
     channel,
     accountId,
-    peer
+    peer,
   });
 
   await hooks.emit({
@@ -1067,9 +2076,9 @@ async function executeInbound({
       channel,
       accountId,
       peer,
-      metadata: metadata || {}
+      metadata: metadata || {},
     },
-    context: { rootDir, automation: config?.automation }
+    context: { rootDir, automation: config?.automation },
   });
 
   const session = store.getOrCreateByRoute({
@@ -1078,7 +2087,7 @@ async function executeInbound({
     routeKey: route.routeKey,
     source: route.source,
     title: `${route.agentName} :: ${route.routeKey}`,
-    settings
+    settings,
   });
 
   const result = await runAndPersist({
@@ -1089,15 +2098,15 @@ async function executeInbound({
       userPolicy: {
         approvalMode: settings?.approvalMode || "never",
         allowPatterns: ["*"],
-        denyPatterns: []
+        denyPatterns: [],
       },
       objective,
       enabledSkillIds,
       settings: {
         ...(session.settings || {}),
-        ...(settings || {})
-      }
-    }
+        ...(settings || {}),
+      },
+    },
   });
 
   return {
@@ -1105,7 +2114,7 @@ async function executeInbound({
     agentId: route.agentId,
     answer: result.answer,
     done: result.done,
-    trace: result.trace
+    trace: result.trace,
   };
 }
 
@@ -1144,7 +2153,7 @@ app.post("/api/run/stream", async (req, res) => {
       requestData,
       onEvent(event) {
         writeEvent("progress", event);
-      }
+      },
     });
 
     writeEvent("done", result);
@@ -1175,7 +2184,7 @@ app.post("/api/inbound/:channel", async (req, res) => {
     peer,
     enabledSkillIds,
     settings,
-    metadata
+    metadata,
   } = req.body ?? {};
 
   if (!modelId || !objective) {
@@ -1192,7 +2201,7 @@ app.post("/api/inbound/:channel", async (req, res) => {
       enabledSkillIds,
       settings,
       metadata,
-      modelId
+      modelId,
     });
     res.json(result);
   } catch (error) {
@@ -1213,7 +2222,9 @@ function sendWs(client, type, payload) {
   client.send(JSON.stringify({ type, payload }));
 }
 
-const wsToken = config?.security?.wsTokenEnv ? process.env[config.security.wsTokenEnv] : null;
+const wsToken = config?.security?.wsTokenEnv
+  ? process.env[config.security.wsTokenEnv]
+  : null;
 const wsAuthRequired = Boolean(wsToken) || Boolean(auth.authEnabled);
 
 const server = createServer(app);
@@ -1222,7 +2233,10 @@ const wss = new WebSocketServer({ noServer: true });
 server.on("upgrade", (request, socket, head) => {
   let parsedUrl;
   try {
-    parsedUrl = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+    parsedUrl = new URL(
+      request.url || "/",
+      `http://${request.headers.host || "localhost"}`,
+    );
   } catch {
     socket.destroy();
     return;
@@ -1253,8 +2267,8 @@ wss.on("connection", (client, _request, context) => {
     policy: {
       approvalMode: "never",
       allowPatterns: ["*"],
-      denyPatterns: []
-    }
+      denyPatterns: [],
+    },
   };
 
   if (auth.authEnabled) {
@@ -1274,8 +2288,8 @@ wss.on("connection", (client, _request, context) => {
     user: {
       id: principal.userId,
       name: principal.name,
-      role: principal.role
-    }
+      role: principal.role,
+    },
   });
 
   client.on("message", async (raw) => {
@@ -1299,13 +2313,15 @@ wss.on("connection", (client, _request, context) => {
         models: models.publicModels(),
         skills: [...skills.publicSkills(), ...mcp.publicTools()],
         hooks: hooks.publicHooks(),
-        sessions: store.listSessions({ userId: principal.userId })
+        sessions: store.listSessions({ userId: principal.userId }),
       });
       return;
     }
 
     if (messageType !== "run") {
-      sendWs(client, "error", { error: `Unsupported message type: ${messageType}` });
+      sendWs(client, "error", {
+        error: `Unsupported message type: ${messageType}`,
+      });
       return;
     }
 
@@ -1331,7 +2347,7 @@ wss.on("connection", (client, _request, context) => {
       const route = router.resolve({
         channel: "ws",
         accountId: "default",
-        peer: { kind: "direct", id: clientId }
+        peer: { kind: "direct", id: clientId },
       });
       session = store.getOrCreateByRoute({
         userId: principal.userId,
@@ -1339,7 +2355,7 @@ wss.on("connection", (client, _request, context) => {
         routeKey: route.routeKey,
         source: route.source,
         title: `${route.agentName} :: ${route.routeKey}`,
-        settings: incoming?.settings || {}
+        settings: incoming?.settings || {},
       });
       await store.flush();
     }
@@ -1355,19 +2371,19 @@ wss.on("connection", (client, _request, context) => {
           enabledSkillIds: incoming?.enabledSkillIds,
           settings: {
             ...session.settings,
-            ...(incoming?.settings || {})
-          }
+            ...(incoming?.settings || {}),
+          },
         },
         onEvent(event) {
           sendWs(client, "progress", event);
-        }
+        },
       });
 
       sendWs(client, "done", {
         sessionId: session.id,
         answer: result.answer,
         done: result.done,
-        trace: result.trace
+        trace: result.trace,
       });
     } catch (error) {
       sendWs(client, "error", { error: String(error?.message || error) });
@@ -1385,7 +2401,7 @@ const telegramHandle = await startTelegramAdapter({
   onInbound: executeInbound,
   logger(message) {
     console.log(`[adapter] ${message}`);
-  }
+  },
 });
 if (telegramHandle) {
   adapterHandles.push(telegramHandle);
@@ -1396,7 +2412,7 @@ const discordHandle = await startDiscordAdapter({
   onInbound: executeInbound,
   logger(message) {
     console.log(`[adapter] ${message}`);
-  }
+  },
 });
 if (discordHandle) {
   adapterHandles.push(discordHandle);
