@@ -3,3 +3,4 @@ node_modules/
 server/config.json
 *.log
 data/
+nul
