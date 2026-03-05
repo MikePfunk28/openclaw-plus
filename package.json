@@ -30,6 +30,10 @@
     "grammy": "^1.38.3",
     "jsonwebtoken": "^9.0.2",
     "playwright": "^1.58.2",
+    "undici": "^7.22.0",
     "ws": "^8.18.3"
+  },
+  "overrides": {
+    "undici": "^7.22.0"
   }
 }
