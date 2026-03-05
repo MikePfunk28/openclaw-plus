@@ -1,5 +1,6 @@
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
+import { detectHfMcp, loadVsCodeMcpConfig } from "../lib/vscode-mcp.mjs";
 
 const exec = promisify(execCb);
 
@@ -17,7 +18,7 @@ export const skill = {
     properties: {
       action: {
         type: "string",
-        enum: ["status", "login", "whoami", "search_datasets", "download_dataset", "search_models"],
+        enum: ["status", "login", "whoami", "search_datasets", "download_dataset", "search_models", "mcp_status", "mcp_probe"],
         description: "Action to perform"
       },
       token: { type: "string", description: "Hugging Face access token (for login)" },
@@ -33,6 +34,35 @@ export const skill = {
     const action = input?.action;
     try {
       switch (action) {
+        case "mcp_status": {
+          const cfg = await loadVsCodeMcpConfig();
+          const hf = detectHfMcp(cfg);
+          return { ok: true, action, vscodeMcpLoaded: cfg.ok, hfMcp: hf };
+        }
+        case "mcp_probe": {
+          const cfg = await loadVsCodeMcpConfig();
+          const hf = detectHfMcp(cfg);
+          if (!hf?.configured || !hf?.url) {
+            return { ok: false, error: "HF MCP server not configured in VS Code mcp.json" };
+          }
+          const token = input?.token || process.env.HF_TOKEN || process.env.HUGGINGFACE_HUB_TOKEN;
+          if (!token) {
+            return { ok: false, error: "HF token missing. Set HF_TOKEN or pass token input." };
+          }
+          const response = await fetch(hf.url, {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          });
+          return {
+            ok: response.ok,
+            action,
+            status: response.status,
+            statusText: response.statusText,
+            url: hf.url
+          };
+        }
         case "status":
         case "whoami": {
           const result = await run("huggingface-cli whoami");

@@ -11,10 +11,19 @@
     "smoke:api": "node scripts/api-smoke.mjs",
     "mcp:bridge": "node scripts/openclaw-mcp-bridge.mjs",
     "doctor": "node scripts/doctor.mjs",
-    "capabilities": "node scripts/capabilities.mjs"
+    "capabilities": "node scripts/capabilities.mjs",
+    "test:patch1": "node scripts/test-patch1.mjs",
+    "test:auth": "node scripts/test-auth.mjs",
+    "test:middleware": "node scripts/test-middleware.mjs",
+    "env:tools": "node scripts/capabilities.mjs --category envTools",
+    "env:doctor": "node scripts/doctor.mjs",
+    "providers:test": "node scripts/capabilities.mjs --category providers",
+    "skills:list": "node scripts/capabilities.mjs --category skills",
+    "adapters:list": "node scripts/capabilities.mjs --category adapters"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.5",
+    "amqplib": "^0.10.9",
     "discord.js": "^14.22.1",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",

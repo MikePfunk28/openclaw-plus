@@ -1,5 +1,6 @@
 import { promisify } from "node:util";
 import { exec as execCb } from "node:child_process";
+import { detectHfMcp, loadVsCodeMcpConfig } from "./vscode-mcp.mjs";
 
 const exec = promisify(execCb);
 
@@ -43,6 +44,8 @@ function providerStatusFromEnv(env) {
 
 export async function getConnectionStatus() {
   const providerStatus = providerStatusFromEnv(process.env);
+  const vscodeMcp = await loadVsCodeMcpConfig();
+  const hfMcp = detectHfMcp(vscodeMcp);
 
   const checks = await Promise.all([
     runCheck("openclaw --version"),
@@ -56,8 +59,14 @@ export async function getConnectionStatus() {
   const [openclaw, github, huggingface, kaggle, gcloud, wsl] = checks;
 
   return {
-    connected: providerStatus.some((p) => p.connected),
+    connected: providerStatus.some((p) => p.connected) || Boolean(hfMcp?.configured),
     providers: providerStatus,
+    vscodeMcp: {
+      loaded: vscodeMcp.ok,
+      path: vscodeMcp.path,
+      serverCount: Object.keys(vscodeMcp.servers || {}).length,
+      hfMcp
+    },
     tools: {
       openclaw: {
         installed: openclaw.ok,
